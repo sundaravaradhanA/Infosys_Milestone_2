@@ -151,3 +151,44 @@ def get_category_trend(
         {"month": r.month, "amount": float(r.amount)}
         for r in results
     ]
+
+@router.get("/transactions-by-date")
+def get_transactions_by_date(
+    user_id: int = Query(1, description="User ID"),
+    month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
+    db: Session = Depends(get_db)
+):
+    """Get all transactions grouped by date for a month"""
+    # Get accounts for the user
+    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    account_ids = [a.id for a in accounts]
+    
+    if not account_ids:
+        return []
+    
+    # Base query for transactions
+    query = db.query(Transaction).filter(
+        Transaction.account_id.in_(account_ids)
+    )
+    
+    # Filter by month if provided
+    if month:
+        query = query.filter(func.to_char(Transaction.created_at, 'YYYY-MM') == month)
+    
+    transactions = query.order_by(Transaction.created_at.desc()).all()
+    
+    # Group by date
+    transactions_by_date = {}
+    for txn in transactions:
+        date_str = txn.created_at.strftime('%Y-%m-%d')
+        if date_str not in transactions_by_date:
+            transactions_by_date[date_str] = []
+        transactions_by_date[date_str].append({
+            "id": txn.id,
+            "description": txn.description,
+            "category": txn.category or "Uncategorized",
+            "amount": float(txn.amount),
+            "created_at": txn.created_at.isoformat()
+        })
+    
+    return transactions_by_date
