@@ -5,17 +5,20 @@ echo ================================================
 echo.
 
 echo [1] Starting Backend Server...
-start "Backend Server" cmd /k "cd /d %~dp0 && cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+start "Backend Server" cmd /k "cd /d %~dp0/backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
+
 
 timeout /t 5 /nobreak >nul
 
 echo [2] Starting Frontend Server...
-start "Frontend Server" cmd /k "cd /d %~dp0 && cd banking-frontend\banking-frontend && npm run dev"
+start "Frontend Server" cmd /k "cd /d %~dp0/banking-frontend/banking-frontend && npm run dev"
+
 
 timeout /t 3 /nobreak >nul
 
 echo [3] Seeding Sample Data...
-start "Seeding Data" cmd /k "cd /d %~dp0 && cd backend && python seed_sample_data.py"
+start "Seeding Data" cmd /k "cd /d %~dp0/backend && python seed_bills_rewards.py"
+
 
 echo.
 echo ================================================

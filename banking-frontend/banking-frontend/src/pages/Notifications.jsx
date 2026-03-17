@@ -1,4 +1,16 @@
 import React, { useState, useEffect } from "react";
+import { 
+  Bell, 
+  Check, 
+  CheckCheck, 
+  Trash2, 
+  Loader2, 
+  AlertTriangle, 
+  AlertCircle, 
+  Info, 
+  XCircle,
+  BellOff
+} from "lucide-react";
 
 function Notifications() {
   const [alerts, setAlerts] = useState([]);
@@ -91,51 +103,116 @@ function Notifications() {
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleString("en-IN");
+    return date.toLocaleString("en-IN", { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const getAlertTypeColor = (type) => {
+  const getAlertIcon = (type) => {
     switch (type) {
       case "budget_exceeded":
-        return "bg-red-100 text-red-700 border-red-200";
+        return <AlertTriangle className="w-5 h-5" />;
       case "warning":
-        return "bg-yellow-100 text-yellow-700 border-yellow-200";
+        return <AlertCircle className="w-5 h-5" />;
       case "error":
-        return "bg-red-100 text-red-700 border-red-200";
+        return <XCircle className="w-5 h-5" />;
       case "info":
       default:
-        return "bg-blue-100 text-blue-700 border-blue-200";
+        return <Info className="w-5 h-5" />;
+    }
+  };
+
+  const getAlertTypeStyles = (type, isRead) => {
+    if (isRead) {
+      return {
+        bg: "bg-dark-50",
+        border: "border-dark-200",
+        iconBg: "bg-dark-200",
+        iconColor: "text-dark-500",
+        titleColor: "text-dark-700",
+        textColor: "text-dark-500"
+      };
+    }
+    
+    switch (type) {
+      case "budget_exceeded":
+        return {
+          bg: "bg-danger-50",
+          border: "border-danger-200",
+          iconBg: "bg-danger-100",
+          iconColor: "text-danger-600",
+          titleColor: "text-danger-800",
+          textColor: "text-danger-700"
+        };
+      case "warning":
+        return {
+          bg: "bg-warning-50",
+          border: "border-warning-200",
+          iconBg: "bg-warning-100",
+          iconColor: "text-warning-600",
+          titleColor: "text-warning-800",
+          textColor: "text-warning-700"
+        };
+      case "error":
+        return {
+          bg: "bg-danger-50",
+          border: "border-danger-200",
+          iconBg: "bg-danger-100",
+          iconColor: "text-danger-600",
+          titleColor: "text-danger-800",
+          textColor: "text-danger-700"
+        };
+      case "info":
+      default:
+        return {
+          bg: "bg-brand-50",
+          border: "border-brand-200",
+          iconBg: "bg-brand-100",
+          iconColor: "text-brand-600",
+          titleColor: "text-brand-800",
+          textColor: "text-brand-700"
+        };
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading notifications...</div>
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Notifications
-            </h2>
-            {unreadCount > 0 && (
-              <p className="text-sm text-gray-500">
-                {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
-              </p>
-            )}
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="card p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+              <Bell className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-display font-bold text-dark-800">Notifications</h2>
+              {unreadCount > 0 ? (
+                <p className="text-dark-500 text-sm">
+                  You have <span className="font-semibold text-brand-600">{unreadCount}</span> unread notification{unreadCount !== 1 ? 's' : ''}
+                </p>
+              ) : (
+                <p className="text-dark-500 text-sm">All caught up!</p>
+              )}
+            </div>
           </div>
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              className="btn-secondary flex items-center gap-2"
             >
+              <CheckCheck className="w-4 h-4" />
               Mark all as read
             </button>
           )}
@@ -143,64 +220,79 @@ function Notifications() {
       </div>
 
       {/* Alerts List */}
-      <div className="bg-white rounded-xl shadow-md p-6">
+      <div className="card overflow-hidden">
         {alerts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No notifications yet
+          <div className="text-center py-16">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-dark-100 flex items-center justify-center">
+              <BellOff className="w-10 h-10 text-dark-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-dark-700 mb-2">No notifications yet</h3>
+            <p className="text-dark-500 text-sm max-w-sm mx-auto">
+              You're all caught up! We'll notify you when there's something new.
+            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`p-4 rounded-lg border ${
-                  alert.is_read 
-                    ? "bg-gray-50 border-gray-200" 
-                    : getAlertTypeColor(alert.alert_type)
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className={`font-semibold ${
-                        alert.is_read ? "text-gray-700" : "text-gray-900"
-                      }`}>
-                        {alert.title}
-                      </h3>
-                      {!alert.is_read && (
-                        <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                          New
-                        </span>
-                      )}
+          <div className="divide-y divide-dark-100">
+            {alerts.map((alert, index) => {
+              const styles = getAlertTypeStyles(alert.alert_type, alert.is_read);
+              return (
+                <div
+                  key={alert.id}
+                  className={`p-5 transition-all duration-200 hover:bg-dark-50 ${styles.bg} ${!alert.is_read ? 'border-l-4' : ''}`}
+                  style={{ 
+                    borderLeftColor: !alert.is_read ? (alert.alert_type === 'budget_exceeded' || alert.alert_type === 'error' ? '#EF4444' : alert.alert_type === 'warning' ? '#F59E0B' : '#0EA5E9') : 'transparent',
+                    animationDelay: `${index * 50}ms`
+                  }}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Icon */}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${styles.iconBg} ${styles.iconColor} flex-shrink-0`}>
+                      {getAlertIcon(alert.alert_type)}
                     </div>
-                    <p className={`text-sm ${
-                      alert.is_read ? "text-gray-500" : "text-gray-700"
-                    }`}>
-                      {alert.message}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatDate(alert.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    {!alert.is_read && (
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-semibold ${styles.titleColor}`}>
+                          {alert.title}
+                        </h3>
+                        {!alert.is_read && (
+                          <span className="px-2 py-0.5 bg-brand-500 text-white text-xs rounded-full font-medium">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-sm ${styles.textColor} mb-2`}>
+                        {alert.message}
+                      </p>
+                      <p className="text-xs text-dark-400">
+                        {formatDate(alert.created_at)}
+                      </p>
+                    </div>
+                    
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!alert.is_read && (
+                        <button
+                          onClick={() => handleMarkAsRead(alert.id)}
+                          className="p-2 rounded-lg bg-dark-100 text-dark-600 hover:bg-dark-200 transition-colors"
+                          title="Mark as read"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleMarkAsRead(alert.id)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        onClick={() => handleDelete(alert.id)}
+                        className="p-2 rounded-lg bg-dark-100 text-dark-600 hover:bg-danger-100 hover:text-danger-600 transition-colors"
+                        title="Delete"
                       >
-                        Mark read
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(alert.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Delete
-                    </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -209,3 +301,4 @@ function Notifications() {
 }
 
 export default Notifications;
+

@@ -6,9 +6,53 @@ import sys
 sys.path.insert(0, '.')
 
 from app.database import SessionLocal
-from app.models import Transaction, Budget, CategoryRule, Alert
+from app.models import Transaction, Budget, CategoryRule, Alert, User, Account
 from datetime import datetime, timedelta
 import random
+
+def seed_users_and_accounts():
+    db = SessionLocal()
+    
+    # Check if user 1 already exists
+    existing_user = db.query(User).filter(User.id == 1).first()
+    if existing_user:
+        print("✅ User 1 already exists")
+        db.close()
+        return
+    
+    # Create user 1
+    user = User(
+        id=1,
+        name="Test User",
+        email="test@example.com",
+        password="password123",
+        phone="+91 9876543210",
+        address="123 Main Street, Mumbai, Maharashtra",
+        kyc_status="Verified"
+    )
+    db.add(user)
+    db.commit()
+    print("✅ Created user 1 (test@example.com / password123)")
+    
+    # Create sample accounts for user 1
+    accounts_data = [
+        {"id": 12, "bank_name": "HDFC Bank", "account_type": "Savings", "balance": 150000.0},
+        {"id": 13, "bank_name": "ICICI Bank", "account_type": "Current", "balance": 75000.0},
+    ]
+    
+    for acc_data in accounts_data:
+        account = Account(
+            id=acc_data["id"],
+            user_id=1,
+            bank_name=acc_data["bank_name"],
+            account_type=acc_data["account_type"],
+            balance=acc_data["balance"]
+        )
+        db.add(account)
+    
+    db.commit()
+    print(f"✅ Created {len(accounts_data)} accounts")
+    db.close()
 
 def seed_transactions():
     db = SessionLocal()

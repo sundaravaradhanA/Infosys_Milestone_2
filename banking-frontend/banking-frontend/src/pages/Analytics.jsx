@@ -12,6 +12,17 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Wallet, 
+  PieChart as PieChartIcon, 
+  BarChart as BarChartIcon,
+  Loader2,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight
+} from "lucide-react";
 
 const COLORS = [
   "#3B82F6", // blue
@@ -45,7 +56,7 @@ function Analytics() {
     try {
       // Fetch transactions
       const txnResponse = await fetch(
-        `http://127.0.0.1:8000/transactions?user_id=${userId}`,
+        `http://127.0.0.1:8000/transactions/?user_id=${userId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -82,6 +93,8 @@ function Analytics() {
   const totalIncome = transactions
     .filter((t) => t.amount > 0)
     .reduce((sum, t) => sum + t.amount, 0);
+  
+  const netBalance = totalIncome - totalExpense;
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat("en-IN", {
@@ -92,70 +105,133 @@ function Analytics() {
     }).format(amount);
   };
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-lg border border-dark-100">
+          <p className="font-semibold text-dark-800">{payload[0].name}</p>
+          <p className="text-brand-600 font-bold text-lg">
+            {formatAmount(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading analytics...</div>
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Month Filter */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">Analytics</h2>
-        <input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        />
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-dark-800">Analytics</h2>
+          <p className="text-dark-500 text-sm mt-1">Track your spending patterns and financial insights</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-dark-400" />
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input-modern py-2 w-auto"
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Total Income</p>
-          <p className="text-2xl font-bold text-green-600">{formatAmount(totalIncome)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Total Expense</p>
-          <p className="text-2xl font-bold text-red-500">{formatAmount(totalExpense)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow">
-          <p className="text-gray-500 text-sm">Balance</p>
-          <p className={`text-2xl font-bold ${totalIncome - totalExpense >= 0 ? "text-blue-600" : "text-red-600"}`}>
-            {formatAmount(totalIncome - totalExpense)}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card-gradient p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-600 flex items-center justify-center shadow-lg shadow-success-500/20">
+              <ArrowDownRight className="w-6 h-6 text-white" />
+            </div>
+            <span className="badge-success">Income</span>
+          </div>
+          <p className="text-dark-500 text-sm">Total Income</p>
+          <p className="text-2xl font-display font-bold text-dark-800 mt-1">
+            {formatAmount(totalIncome)}
           </p>
+          <div className="flex items-center gap-1 mt-2 text-success-600 text-sm">
+            <TrendingUp className="w-4 h-4" />
+            <span>This month</span>
+          </div>
+        </div>
+        
+        <div className="card p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-danger-400 to-danger-600 flex items-center justify-center shadow-lg shadow-danger-500/20">
+              <ArrowUpRight className="w-6 h-6 text-white" />
+            </div>
+            <span className="badge-danger">Expense</span>
+          </div>
+          <p className="text-dark-500 text-sm">Total Expense</p>
+          <p className="text-2xl font-display font-bold text-dark-800 mt-1">
+            {formatAmount(totalExpense)}
+          </p>
+          <div className="flex items-center gap-1 mt-2 text-danger-600 text-sm">
+            <TrendingDown className="w-4 h-4" />
+            <span>This month</span>
+          </div>
+        </div>
+
+        <div className={`card p-6 hover:shadow-lg transition-shadow ${netBalance >= 0 ? '' : ''}`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${netBalance >= 0 ? 'bg-gradient-to-br from-brand-400 to-brand-600 shadow-brand-500/20' : 'bg-gradient-to-br from-warning-400 to-warning-600 shadow-warning-500/20'}`}>
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
+            <span className={netBalance >= 0 ? "badge-info" : "badge-warning"}>
+              {netBalance >= 0 ? "Positive" : "Negative"}
+            </span>
+          </div>
+          <p className="text-dark-500 text-sm">Net Balance</p>
+          <p className={`text-2xl font-display font-bold mt-1 ${netBalance >= 0 ? "text-brand-600" : "text-warning-600"}`}>
+            {formatAmount(netBalance)}
+          </p>
+          <div className={`flex items-center gap-1 mt-2 text-sm ${netBalance >= 0 ? "text-brand-600" : "text-warning-600"}`}>
+            {netBalance >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            <span>Savings rate: {totalIncome > 0 ? ((netBalance / totalIncome) * 100).toFixed(1) : 0}%</span>
+          </div>
         </div>
       </div>
 
       {/* Spending by Category Chart */}
-      <div className="bg-white p-6 rounded-xl shadow">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">
-            Spending by Category - {selectedMonth}
-          </h2>
-          <div className="flex gap-2">
+      <div className="card p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-xl font-display font-bold text-dark-800">
+              Spending by Category
+            </h2>
+            <p className="text-dark-500 text-sm">Visual breakdown for {selectedMonth}</p>
+          </div>
+          <div className="flex gap-2 bg-dark-100 p-1 rounded-xl">
             <button
               onClick={() => setChartType("pie")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 chartType === "pie"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-white text-brand-600 shadow-sm"
+                  : "text-dark-600 hover:text-dark-800"
               }`}
             >
+              <PieChartIcon className="w-4 h-4" />
               Pie Chart
             </button>
             <button
               onClick={() => setChartType("bar")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 chartType === "bar"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-white text-brand-600 shadow-sm"
+                  : "text-dark-600 hover:text-dark-800"
               }`}
             >
+              <BarChartIcon className="w-4 h-4" />
               Bar Chart
             </button>
           </div>
@@ -183,35 +259,24 @@ function Analytics() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(value) => formatAmount(value)}
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                    }}
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    formatter={(value) => <span className="text-dark-700">{value}</span>}
                   />
-                  <Legend />
                 </PieChart>
               ) : (
-                <BarChart data={categoryData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
+                <BarChart data={categoryData} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis type="number" tickFormatter={(v) => `₹${v}`} />
                   <YAxis
                     dataKey="category"
                     type="category"
                     width={120}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 12, fill: '#64748B' }}
                   />
-                  <Tooltip
-                    formatter={(value) => formatAmount(value)}
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar dataKey="amount" name="Amount">
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="amount" name="Amount" radius={[0, 4, 4, 0]}>
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -221,60 +286,73 @@ function Analytics() {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-64 text-gray-500">
-            <p>No categorized transactions for this month.</p>
+          <div className="flex flex-col items-center justify-center h-64 text-dark-500">
+            <PieChartIcon className="w-16 h-16 text-dark-300 mb-4" />
+            <p className="text-lg font-medium">No categorized transactions for this month</p>
+            <p className="text-sm">Add categories to your transactions to see analytics</p>
           </div>
         )}
       </div>
 
       {/* Category Breakdown Table */}
-      <div className="bg-white p-6 rounded-xl shadow">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">
-          Category Breakdown
-        </h2>
+      <div className="card overflow-hidden">
+        <div className="p-6 border-b border-dark-100">
+          <h2 className="text-xl font-display font-bold text-dark-800">
+            Category Breakdown
+          </h2>
+          <p className="text-dark-500 text-sm mt-1">Detailed view of your spending by category</p>
+        </div>
         {categoryData.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="table-modern">
               <thead>
-                <tr className="border-b text-gray-600">
-                  <th className="py-3 px-4 font-semibold">Category</th>
-                  <th className="py-3 px-4 font-semibold text-right">Amount</th>
-                  <th className="py-3 px-4 font-semibold text-right">% of Total</th>
-                  <th className="py-3 px-4 font-semibold">Visual</th>
+                <tr>
+                  <th className="pl-6">Category</th>
+                  <th className="text-right">Amount</th>
+                  <th className="text-right">% of Total</th>
+                  <th className="pr-6">Visual</th>
                 </tr>
               </thead>
               <tbody>
                 {categoryData.map((item, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      ></span>
-                      {item.category}
+                  <tr 
+                    key={index} 
+                    className="group"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <td className="pl-6">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="font-medium text-dark-800">{item.category}</span>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-right font-medium">
-                      {formatAmount(item.amount)}
+                    <td className="text-right">
+                      <span className="font-display font-bold text-dark-800">
+                        {formatAmount(item.amount)}
+                      </span>
                     </td>
-                    <td className="py-3 px-4 text-right text-gray-600">
-                      {totalExpense > 0
-                        ? Math.abs((item.amount / totalExpense) * 100).toFixed(1)
-                        : 0}
-                      %
+                    <td className="text-right">
+                      <span className="text-dark-600">
+                        {totalExpense > 0
+                          ? Math.abs((item.amount / totalExpense) * 100).toFixed(1)
+                          : 0}
+                        %
+                      </span>
                     </td>
-                    <td className="py-3 px-4 w-32">
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <td className="pr-6 w-40">
+                      <div className="h-2.5 bg-dark-100 rounded-full overflow-hidden">
                         <div
-                          className="h-full rounded-full"
+                          className="h-full rounded-full transition-all duration-500 group-hover:opacity-80"
                           style={{
-                            width: `${
-                              totalExpense > 0
-                                ? Math.abs((item.amount / totalExpense) * 100)
-                                : 0
-                            }%`,
+                            width: `${totalExpense > 0
+                              ? Math.abs((item.amount / totalExpense) * 100)
+                              : 0}%`,
                             backgroundColor: item.color,
                           }}
-                        ></div>
+                        />
                       </div>
                     </td>
                   </tr>
@@ -283,8 +361,9 @@ function Analytics() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            No data available for this month
+          <div className="text-center py-12 text-dark-500">
+            <BarChartIcon className="w-12 h-12 mx-auto mb-3 text-dark-300" />
+            <p>No data available for this month</p>
           </div>
         )}
       </div>
@@ -293,3 +372,4 @@ function Analytics() {
 }
 
 export default Analytics;
+

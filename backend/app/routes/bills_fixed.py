@@ -1,0 +1,155 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.database import get_db
+from app.models.bill import Bill
+from app.schemas.bill import BillCreate
+from app.services.bill_status import determine_bill_status
+
+router = APIRouter(tags=["Bills"])
+
+
+# CREATE BILL
+@router.post("/")
+def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
+
+    # Validate bill name
+    if not bill.bill_name.strip():
+        raise HTTPException(status_code=400, detail="Bill name cannot be empty")
+
+    # Validate amount
+    if bill.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    new_bill = Bill(
+        user_id=bill.user_id,
+        bill_name=bill.bill_name,
+        amount=bill.amount,
+        due_date=datetime.fromisoformat(bill.due_date),
+        is_paid=False,
+        category="Bills"
+    )
+
+    db.add(new_bill)
+    db.commit()
+    db.refresh(new_bill)
+
+    return {
+        'id': new_bill.id,
+        'user_id': new_bill.user_id,
+        'bill_name': new_bill.bill_name,
+        'amount': new_bill.amount,
+        'due_date': new_bill.due_date.isoformat(),
+        'is_paid': new_bill.is_paid,
+        'category': new_bill.category,
+        'status': determine_bill_status(new_bill)
+    }
+
+
+# GET BILLS
+@router.get("/")
+def get_bills(user_id: int = Query(...), db: Session = Depends(get_db)):
+
+    bills = db.query(Bill).filter(Bill.user_id == user_id).all()
+
+    response_data = []
+    for bill in bills:
+        status = determine_bill_status(bill)
+        response_data.append({
+            'id': bill.id,
+            'user_id': bill.user_id,
+            'bill_name': bill.bill_name,
+            'amount': bill.amount,
+            'due_date': bill.due_date.isoformat(),
+            'is_paid': bill.is_paid,
+            'category': bill.category or 'Bills',
+            'status': status
+        })
+    return response_data
+
+
+# UPDATE BILL
+@router.put("/{bill_id}")
+def update_bill(
+    bill_id: int,
+    bill: BillCreate,
+    db: Session = Depends(get_db)
+):
+
+    existing_bill = db.query(Bill).filter(Bill.id == bill_id).first()
+
+    if not existing_bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # Validate bill name
+    if not bill.bill_name.strip():
+        raise HTTPException(status_code=400, detail="Bill name cannot be empty")
+
+    # Validate amount
+    if bill.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    existing_bill.bill_name = bill.bill_name
+    existing_bill.amount = bill.amount
+    existing_bill.due_date = datetime.fromisoformat(bill.due_date)
+
+    db.commit()
+    db.refresh(existing_bill)
+
+    return {
+        'id': existing_bill.id,
+        'user_id': existing_bill.user_id,
+        'bill_name': existing_bill.bill_name,
+        'amount': existing_bill.amount,
+        'due_date': existing_bill.due_date.isoformat(),
+        'is_paid': existing_bill.is_paid,
+        'category': existing_bill.category,
+        'status': determine_bill_status(existing_bill)
+    }
+
+
+# MARK BILL AS PAID
+@router.patch("/{bill_id}/pay")
+def pay_bill(
+    bill_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+
+    bill = db.query(Bill).filter(
+        Bill.id == bill_id,
+        Bill.user_id == user_id
+    ).first()
+
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    bill.is_paid = True
+
+    db.commit()
+    db.refresh(bill)
+
+    return {"message": "Bill marked as paid", "status": "paid"}
+
+
+# DELETE BILL
+@router.delete("/{bill_id}")
+def delete_bill(
+    bill_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+
+    bill = db.query(Bill).filter(
+        Bill.id == bill_id,
+        Bill.user_id == user_id
+    ).first()
+
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    db.delete(bill)
+    db.commit()
+
+    return {"message": "Bill deleted successfully"}
+

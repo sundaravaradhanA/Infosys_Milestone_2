@@ -1,4 +1,4 @@
-from .user import UserCreate, UserResponse
+from .user import UserCreate, UserResponse, UserUpdate
 from .account import AccountCreate, AccountResponse
 from .transaction import TransactionCreate, TransactionResponse, TransactionUpdate
 from .budget import BudgetCreate, BudgetResponse, BudgetUpdate, BudgetWithProgress

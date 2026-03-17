@@ -10,6 +10,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String)
     phone = Column(String)
+    address = Column(String, default="")
     kyc_status = Column(String, default="Pending")
     
     # Relationships
@@ -19,3 +20,4 @@ class User(Base):
     rewards = relationship("Reward", back_populates="user")
     alerts = relationship("Alert", back_populates="user")
     category_rules = relationship("CategoryRule", back_populates="user")
+
