@@ -79,9 +79,14 @@ function Dashboard() {
             </NavLink>
           ))}
         </nav>
-        <button onClick={handleLogout} className="mt-auto bg-red-500 hover:bg-red-600 text-white py-2 rounded-md transition">
+<button onClick={handleLogout} className="mt-auto bg-red-500 hover:bg-red-600 text-white py-2 rounded-md transition">
           Sign out
         </button>
+        <div className="mt-4 p-3 bg-gray-800 rounded-lg">
+          <h4 className="font-semibold mb-2">Exports</h4>
+          <a href="http://127.0.0.1:8000/export/transactions?format=csv&user_id=1" className="block text-sm text-blue-300 hover:text-blue-100 mb-1">📊 Transactions CSV</a>
+          <a href="http://127.0.0.1:8000/export/insights?format=pdf&user_id=1" className="block text-sm text-green-300 hover:text-green-100">📄 Insights PDF</a>
+        </div>
       </aside>
       <div className="flex-1 flex flex-col">
         <header className="bg-white shadow px-8 py-4">

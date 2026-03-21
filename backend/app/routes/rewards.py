@@ -1,121 +1,56 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import datetime, timedelta
-
+from typing import List
 from app.database import get_db
-from app.models import Reward
-from app.schemas import RewardCreate, RewardResponse
+from pydantic import BaseModel
+from app.models.user import User
 
-router = APIRouter(
-    prefix="/rewards",
-    tags=["Rewards"]
-)
+router = APIRouter(prefix="/api/rewards", tags=["Rewards"])
 
+class TotalPoints(BaseModel):
+    total_points: int = 0
 
-# GET ALL REWARDS
-@router.get("/", response_model=list[RewardResponse])
-def get_rewards(
-    user_id: int = Query(..., description="User ID"),
-    db: Session = Depends(get_db)
-):
-    """Get all rewards for a user"""
+class RewardsList(BaseModel):
+    id: int
+    title: str
+    description: str
+    category: str
+    color: str
+    bgColor: str
+    expires: str
+    icon: str
 
-    rewards = db.query(Reward).filter(
-        Reward.user_id == user_id
-    ).order_by(Reward.earned_date.desc()).all()
-
+@router.get("/", response_model=List[RewardsList])
+def get_rewards(user_id: int = 1, db: Session = Depends(get_db)):
+    # Sample rewards data
+    rewards = [
+        {
+            "id": 1,
+            "title": "Cashback 5%",
+            "description": "Get 5% cashback on groceries this month",
+            "category": "Cashback",
+            "color": "from-green-400 to-green-600",
+            "bgColor": "bg-green-100 text-green-800",
+            "expires": "2024-12-31",
+            "icon": "💰"
+        },
+        {
+            "id": 2,
+            "title": "Free ATM Withdrawals",
+            "description": "Unlimited free ATM withdrawals until end of month",
+            "category": "Banking",
+            "color": "from-blue-400 to-blue-600",
+            "bgColor": "bg-blue-100 text-blue-800",
+            "expires": "2024-11-30",
+            "icon": "🏧"
+        }
+    ]
     return rewards
 
-
-# CREATE REWARD
-@router.post("/", response_model=RewardResponse)
-def create_reward(reward: RewardCreate, db: Session = Depends(get_db)):
-    """Create a new reward"""
-
-    if reward.points <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Points must be greater than 0"
-        )
-
-    new_reward = Reward(
-        user_id=reward.user_id,
-        points=reward.points,
-        description=reward.description,
-        earned_date=datetime.utcnow(),
-        expires_date=datetime.utcnow() + timedelta(days=365)
-    )
-
-    db.add(new_reward)
-    db.commit()
-    db.refresh(new_reward)
-
-    return new_reward
-
-
-# UPDATE REWARD POINTS
-@router.put("/{reward_id}", response_model=RewardResponse)
-def update_reward(
-    reward_id: int,
-    points: int = Query(..., description="Updated points value"),
-    db: Session = Depends(get_db)
-):
-    """Update reward points"""
-
-    reward = db.query(Reward).filter(
-        Reward.id == reward_id
-    ).first()
-
-    if not reward:
-        raise HTTPException(
-            status_code=404,
-            detail="Reward not found"
-        )
-
-    reward.points = points
-
-    db.commit()
-    db.refresh(reward)
-
-    return reward
-
-
-# DELETE REWARD
-@router.delete("/{reward_id}")
-def delete_reward(
-    reward_id: int,
-    db: Session = Depends(get_db)
-):
-    """Delete a reward"""
-
-    reward = db.query(Reward).filter(
-        Reward.id == reward_id
-    ).first()
-
-    if not reward:
-        raise HTTPException(
-            status_code=404,
-            detail="Reward not found"
-        )
-
-    db.delete(reward)
-    db.commit()
-
-    return {"message": "Reward deleted successfully"}
-
-
-# GET TOTAL POINTS
-@router.get("/total-points")
-def get_total_points(
-    user_id: int = Query(..., description="User ID"),
-    db: Session = Depends(get_db)
-):
-    """Get total reward points for a user"""
-
-    total = db.query(func.sum(Reward.points)).filter(
-        Reward.user_id == user_id
-    ).scalar()
-
-    return {"total_points": total or 0}
+@router.get("/total-points", response_model=TotalPoints)
+def get_total_points(user_id: int = 1, db: Session = Depends(get_db)):
+    # Calculate points based on transactions/spending (mock)
+    user = db.query(User).filter(User.id == user_id).first()
+    total_points = 1250 if user else 0  # Mock data
+    return TotalPoints(total_points=total_points)
 

@@ -162,24 +162,33 @@ function Budget() {
     fetchTransactions();
   }, [currentMonth]);
 
-  const fetchBudgets = async () => {
-    const token = localStorage.getItem("token");
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/budgets/?user_id=1&month=${currentMonth}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setBudgets(data);
+    const fetchBudgets = async () => {
+      const token = localStorage.getItem("token");
+      try {
+        const url = `http://127.0.0.1:8000/budgets/?user_id=1`;  // All budgets, no month filter
+        const headers = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const response = await fetch(url, { headers }).catch(err => {
+          console.error('Budgets fetch failed:', err);
+          return { ok: false };
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched budgets count:', data.length);
+          console.log('Sample:', data.slice(0,3));
+          setBudgets(data);
+        } else {
+          console.error('Response not OK:', response.status);
+        }
+      } catch (err) {
+        console.error("Failed to fetch budgets:", err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Failed to fetch budgets:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
 
   const fetchTransactions = async () => {
     const token = localStorage.getItem("token");

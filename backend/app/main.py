@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import auth, accounts, transactions, budgets, bills, bills_fixed, rewards, alerts, insights, categories
+from app.routes import auth, accounts, transactions, budgets, bills, bills_fixed, rewards, alerts, insights, categories, export
 
 from app.services.reminder_service import start_scheduler
 from app.routes import currency
@@ -32,6 +32,7 @@ app.include_router(bills_fixed.router, prefix="/api/bills_fixed", tags=["Bills F
 app.include_router(rewards.router, prefix="/api/rewards", tags=["Rewards"])
 app.include_router(alerts.router, prefix="/alerts", tags=["Alerts"])
 app.include_router(insights.router, prefix="/insights", tags=["Insights"])
+app.include_router(export.router, prefix="/export", tags=["Export"])
 app.include_router(categories.router, prefix="", tags=["Categories"])
 app.include_router(currency.router, prefix="/currency", tags=["Currency"])
 

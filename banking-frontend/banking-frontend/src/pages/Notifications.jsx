@@ -16,8 +16,10 @@ function Notifications() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
     fetchAlerts();
+    const interval = setInterval(fetchAlerts, 30000);  // 30s poll
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAlerts = async () => {

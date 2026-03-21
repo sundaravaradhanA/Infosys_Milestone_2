@@ -40,6 +40,8 @@ const COLORS = [
 function Analytics() {
   const [transactions, setTransactions] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
+  const [topMerchants, setTopMerchants] = useState([]);
+  const [burnRate, setBurnRate] = useState(null);
   const [chartType, setChartType] = useState("pie");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
@@ -77,9 +79,31 @@ function Analytics() {
         const catData = await categoryResponse.json();
         const formattedData = catData.map((item, index) => ({
           ...item,
+          // Convert USD amount to INR (using standard 84 rate used elsewhere)
+          amount: item.amount * 84,
           color: COLORS[index % COLORS.length],
         }));
         setCategoryData(formattedData);
+      }
+
+      // Fetch top merchants
+      const merchantsResponse = await fetch(
+        `http://127.0.0.1:8000/insights/top-merchants?user_id=${userId}&month=${selectedMonth}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (merchantsResponse.ok) {
+        const merchData = await merchantsResponse.json();
+        setTopMerchants(merchData);
+      }
+
+      // Fetch burn rate
+      const burnRateResponse = await fetch(
+        `http://127.0.0.1:8000/insights/burn-rate?user_id=${userId}&month=${selectedMonth}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (burnRateResponse.ok) {
+        const burnData = await burnRateResponse.json();
+        setBurnRate(burnData);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -90,9 +114,11 @@ function Analytics() {
 
   // Calculate totals
   const totalExpense = categoryData.reduce((sum, item) => sum + item.amount, 0);
+  
+  // Transactions API returns amount_usd and amount_inr
   const totalIncome = transactions
-    .filter((t) => t.amount > 0)
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((t) => t.amount_usd > 0)
+    .reduce((sum, t) => sum + t.amount_inr, 0);
   
   const netBalance = totalIncome - totalExpense;
 
@@ -366,6 +392,55 @@ function Analytics() {
             <p>No data available for this month</p>
           </div>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Top Merchants */}
+        <div className="card p-6">
+          <h2 className="text-xl font-display font-bold text-dark-800 mb-4">Top Merchants</h2>
+          {topMerchants.length > 0 ? (
+            <div className="space-y-4">
+              {topMerchants.slice(0, 5).map((merchant, idx) => (
+                <div key={idx} className="flex justify-between items-center bg-dark-50 p-3 rounded-lg">
+                  <span className="font-semibold text-dark-700">{merchant.merchant}</span>
+                  <span className="font-bold text-danger-600">{formatAmount(merchant.total_spent * usdToInr)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-dark-500 text-sm py-4 text-center">No merchants found for this month.</p>
+          )}
+        </div>
+
+        {/* Burn Rate */}
+        <div className="card p-6 flex flex-col justify-center">
+          <h2 className="text-xl font-display font-bold text-dark-800 mb-4">Budget Burn Rate</h2>
+          {burnRate && burnRate.total_budget > 0 ? (
+            <div className="space-y-4 text-center">
+              <div className="relative w-32 h-32 mx-auto flex items-center justify-center rounded-full border-8 border-dark-100">
+                <div 
+                  className="absolute inset-0 rounded-full border-8 border-brand-500"
+                  style={{ 
+                    clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, 
+                    transform: `rotate(${(burnRate.used_percent / 100) * 360}deg)`,
+                    borderColor: burnRate.used_percent > 100 ? '#ef4444' : '#3b82f6'
+                  }}
+                ></div>
+                <div className="z-10 bg-white w-24 h-24 rounded-full flex items-center justify-center flex-col shadow-inner">
+                  <span className="text-2xl font-bold font-display">{Math.round(burnRate.used_percent)}%</span>
+                  <span className="text-xs text-dark-400">Used</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-dark-600">Total Budget: <span className="font-bold">{formatAmount(burnRate.total_budget * usdToInr)}</span></p>
+                <p className="text-dark-600">Spent: <span className="font-bold text-danger-600">{formatAmount(burnRate.total_spent * usdToInr)}</span></p>
+                <p className="mt-2 text-sm text-dark-500">Projected Monthly: {formatAmount(burnRate.projected_monthly * usdToInr)}</p>
+              </div>
+            </div>
+          ) : (
+             <p className="text-dark-500 text-sm py-4 text-center">No active budget matching selected criteria.</p>
+          )}
+        </div>
       </div>
     </div>
   );

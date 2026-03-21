@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+from datetime import datetime
 from app.database import get_db
-from app.models import Transaction, Account
+from app.models import Transaction, Account, Budget
 
 router = APIRouter()
 
@@ -192,3 +193,61 @@ def get_transactions_by_date(
         })
     
     return transactions_by_date
+
+@router.get("/top-merchants")
+def get_top_merchants(
+    user_id: int = Query(1),
+    limit: int = Query(10),
+    month: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Top 10 merchants by spending amount"""
+    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    account_ids = [a.id for a in accounts]
+    if not account_ids:
+        return []
+    
+    query = db.query(
+        Transaction.description.label('merchant'),
+        func.sum(func.abs(Transaction.amount)).label('total_spent')
+    ).filter(
+        Transaction.account_id.in_(account_ids),
+        Transaction.amount < 0,
+        Transaction.description.isnot(None)
+    ).group_by(Transaction.description).order_by(func.sum(func.abs(Transaction.amount)).desc()).limit(limit)
+    
+    if month:
+        query = query.filter(func.to_char(Transaction.created_at, 'YYYY-MM') == month)
+    
+    results = query.all()
+    return [{"merchant": r.merchant or "Unknown", "total_spent": float(r.total_spent)} for r in results]
+
+@router.get("/burn-rate")
+def get_burn_rate(
+    user_id: int = Query(1),
+    month: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Budget burn rate: % of budget used"""
+    budgets = db.query(Budget).filter(Budget.user_id == user_id).all()
+    if not budgets:
+        return {"burn_rate": 0, "used_percent": 0}
+    
+    total_limit = sum(b.limit_amount for b in budgets)
+    total_spent = sum(b.spent_amount for b in budgets)
+    used_percent = (total_spent / total_limit * 100) if total_limit > 0 else 0
+    
+    # Days used estimate
+    now = datetime.now()
+    month_start = now.replace(day=1)
+    days_passed = (now - month_start).days
+    projected = (total_spent / days_passed * 30) if days_passed > 0 else 0
+    burn_rate = min(projected / total_limit * 100, 100) if total_limit > 0 else 0
+    
+    return {
+        "total_budget": float(total_limit),
+        "total_spent": float(total_spent),
+        "used_percent": round(used_percent, 2),
+        "projected_monthly": float(projected),
+        "burn_rate_percent": round(burn_rate, 2)
+    }

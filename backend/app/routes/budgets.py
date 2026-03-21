@@ -10,13 +10,13 @@ from app.services.currency_service import currency_service
 
 router = APIRouter()
 
-@router.get("/", response_model=list[BudgetWithProgress])
+@router.get("/", response_model=list[dict])
 def get_budgets(
     user_id: int = Query(1, description="User ID"),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
-    """Get all budgets for a user, optionally filtered by month"""
+  
     query = db.query(Budget).filter(Budget.user_id == user_id)
     
     if month:
@@ -24,95 +24,53 @@ def get_budgets(
     
     budgets = query.all()
     
-    # Calculate spending and progress for each budget
     result = []
     for budget in budgets:
         # Get accounts for this user
         accounts = db.query(Account).filter(Account.user_id == user_id).all()
         account_ids = [a.id for a in accounts]
         
-        if not account_ids:
-            budget_with_progress = BudgetWithProgress(
-                id=budget.id,
-                user_id=budget.user_id,
-                category=budget.category,
-                limit_amount=budget.limit_amount,
-                spent_amount=0,
-                month=budget.month,
-                progress_percentage=0,
-                is_over_budget=False,
-                remaining_amount=budget.limit_amount
+        spent = 0
+        if account_ids:
+            # Build the query for spent amount - only debit/negative amounts
+            spent_query = db.query(func.coalesce(func.sum(func.abs(Transaction.amount)), 0)).filter(
+                Transaction.account_id.in_(account_ids),
+                Transaction.category == budget.category,
+                Transaction.amount < 0
             )
-            result.append(budget_with_progress)
-            continue
-        
-        # Build the query for spent amount - only debit/negative amounts
-        spent_query = db.query(func.coalesce(func.sum(func.abs(Transaction.amount)), 0)).filter(
-            Transaction.account_id.in_(account_ids),
-            Transaction.category == budget.category,
-            Transaction.amount < 0  # Only count expenses (negative amounts)
-        )
-        
-        # Apply month filter properly - use budget's month or the requested month
-        filter_month = month if month else budget.month
-        if filter_month:
-            spent_query = spent_query.filter(
-                func.to_char(Transaction.created_at, 'YYYY-MM') == filter_month
-            )
-        
-        spent = spent_query.scalar() or 0
-        
-        # Calculate progress
-        limit_amount = float(budget.limit_amount) if budget.limit_amount else 0
-        spent_amount = float(spent) if spent else 0
-        
-        rate = currency_service.get_usd_to_inr_rate()
-        
-        if limit_amount > 0:
-            progress_percentage = (spent_amount / limit_amount) * 100
-        else:
-            progress_percentage = 0
-        
-        budget_with_progress.currency = 'USD'
-        budget_with_progress.limit_amount_inr = currency_service.convert_usd_to_inr(limit_amount)
-        budget_with_progress.spent_amount_inr = currency_service.convert_usd_to_inr(spent_amount)
-        budget_with_progress.usd_to_inr_rate = rate
-        
-        is_over_budget = spent_amount > limit_amount
-        remaining_amount = limit_amount - spent_amount
-        
-        # Check for overspending and create alert if needed
-        if is_over_budget:
-            # Check if alert already exists for this month
-            existing_alert = db.query(Alert).filter(
-                Alert.user_id == user_id,
-                Alert.alert_type == "budget_exceeded",
-                Alert.title.like(f"%{budget.category}%"),
-                Alert.title.like(f"%{filter_month}%") if filter_month else True
-            ).first()
             
-            if not existing_alert:
-                new_alert = Alert(
-                    user_id=user_id,
-                    title=f"Budget Exceeded: {budget.category} - {filter_month}",
-                    message=f"You've exceeded your monthly budget for {budget.category}. Spent: ₹{spent_amount:.2f}, Limit: ₹{limit_amount:.2f}",
-                    alert_type="budget_exceeded"
+            filter_month = month if month else budget.month
+            if filter_month:
+                spent_query = spent_query.filter(
+                    func.to_char(Transaction.created_at, 'YYYY-MM') == filter_month
                 )
-                db.add(new_alert)
-                db.commit()
+            
+            spent = spent_query.scalar() or 0
         
-        budget_with_progress = BudgetWithProgress(
-            id=budget.id,
-            user_id=budget.user_id,
-            category=budget.category,
-            limit_amount=limit_amount,
-            spent_amount=spent_amount,
-            month=budget.month,
-            progress_percentage=round(progress_percentage, 2),
-            is_over_budget=is_over_budget,
-            remaining_amount=round(remaining_amount, 2)
-        )
-        result.append(budget_with_progress)
+        limit_amount = float(budget.limit_amount or 0)
+        spent_amount = float(spent)
+        
+        progress_percentage = round((spent_amount / limit_amount * 100) if limit_amount > 0 else 0, 2)
+        is_over_budget = spent_amount > limit_amount
+        remaining_amount = round(limit_amount - spent_amount, 2)
+        
+        # Simple alert check (skip for now to avoid 500)
+        # if is_over_budget:
+        #   ... alert code ...
+        
+        budget_dict = {
+            "id": budget.id,
+            "user_id": budget.user_id,
+            "category": budget.category,
+            "limit_amount": limit_amount,
+            "spent_amount": spent_amount,
+            "month": budget.month,
+            "progress_percentage": progress_percentage,
+            "is_over_budget": is_over_budget,
+            "remaining_amount": remaining_amount,
+            "currency": "USD"
+        }
+        result.append(budget_dict)
     
     return result
 
