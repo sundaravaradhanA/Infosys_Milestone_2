@@ -51,7 +51,7 @@ function Bills() {
     e.preventDefault();
     setSubmitLoading(true);
     try {
-      const body = { user_id: 1, bill_name: formData.bill_name, amount: parseFloat(formData.amount), due_date: formData.due_date };
+    const body = { user_id: 1, bill_name: formData.bill_name, amount_usd: parseFloat(formData.amount), due_date: formData.due_date };
 
       let url = 'http://127.0.0.1:8000/api/bills_fixed/';
       let method = 'POST';
@@ -111,7 +111,7 @@ function Bills() {
   const handleEdit = (bill) => {
     setFormData({
       bill_name: bill.bill_name,
-      amount: bill.amount.toString(),
+      amount: bill.amount_usd ? bill.amount_usd.toString() : bill.amount.toString(),
       due_date: bill.due_date.split('T')[0],
     });
     setEditingId(bill.id);
@@ -227,7 +227,7 @@ function Bills() {
                         <div className="font-medium text-gray-900">{bill.bill_name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(bill.amount)}
+                        {formatCurrency(bill.amount_inr || bill.amount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {new Date(bill.due_date).toLocaleDateString()}
@@ -297,7 +297,7 @@ function Bills() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Amount Due</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amount Due (USD)</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
@@ -306,10 +306,11 @@ function Bills() {
                     value={formData.amount}
                     onChange={(e) => setFormData({...formData, amount: e.target.value})}
                     className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="500"
+                    placeholder="6"
                     required
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">≈ ₹500 (rate: 83.5)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>

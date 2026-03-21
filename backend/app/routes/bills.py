@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models.bill import Bill
 from app.schemas.bill import BillCreate, BillResponse
 from app.services.bill_status import determine_bill_status
+from app.services.currency_service import currency_service
 
 router = APIRouter(tags=["Bills"])
 
@@ -46,14 +47,18 @@ def get_bills(user_id: int = Query(...), db: Session = Depends(get_db)):
 
     bills = db.query(Bill).filter(Bill.user_id == user_id).all()
 
+    rate = currency_service.get_usd_to_inr_rate()
     response_data = []
     for bill in bills:
         status = determine_bill_status(bill)
         response_data.append({
             'id': bill.id,
             'user_id': bill.user_id,
+            'currency': 'USD',
+            'amount_usd': float(bill.amount),
+            'amount_inr': currency_service.convert_usd_to_inr(float(bill.amount)),
+            'usd_to_inr_rate': rate,
             'bill_name': bill.bill_name,
-            'amount': bill.amount,
             'due_date': bill.due_date.isoformat(),
             'is_paid': bill.is_paid,
             'category': bill.category,

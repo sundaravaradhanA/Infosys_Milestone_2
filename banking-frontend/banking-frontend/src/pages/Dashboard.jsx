@@ -131,7 +131,7 @@ function DashboardHome() {
       });
   }, [token]);
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance_inr, 0);
 
   const handleTransfer = () => {
     if (!selectedAccount || !amount) {
@@ -142,7 +142,7 @@ function DashboardHome() {
     setAmount("");
   };
 
-  const formatCurrency = (amt) => {
+const formatCurrency = (amt) => {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0 }).format(amt);
   };
 
@@ -181,7 +181,7 @@ function DashboardHome() {
                 <p className="font-semibold">{acc.bank_name}</p>
                 <p className="text-sm text-gray-500">{acc.account_type}</p>
               </div>
-              <p className="font-bold text-blue-600">{formatCurrency(acc.balance)}</p>
+              <p className="font-bold text-blue-600">{formatCurrency(acc.balance_inr)}</p>
             </div>
           ))
         ) : (

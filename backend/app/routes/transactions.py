@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Transaction, CategoryRule, Account
 from app.schemas import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.services.currency_service import currency_service
 from typing import Optional
 
 router = APIRouter()
@@ -57,7 +58,20 @@ def get_transactions(
     # Apply pagination
     transactions = query.order_by(Transaction.created_at.desc()).offset(skip).limit(limit).all()
     
-    return transactions
+    rate = currency_service.get_usd_to_inr_rate()
+    return [
+        TransactionResponse(
+            id=t.id,
+            created_at=t.created_at,
+            account_id=t.account_id,
+            description=t.description,
+            amount_usd=float(t.amount),
+            category=t.category,
+            currency=getattr(t, 'currency', 'USD'),
+            amount_inr=currency_service.convert_usd_to_inr(float(t.amount)),
+            usd_to_inr_rate=rate
+        ) for t in transactions
+    ]
 
 @router.get("/count")
 def get_transactions_count(
@@ -96,8 +110,9 @@ def create_transaction(txn: TransactionCreate, db: Session = Depends(get_db)):
     new_txn = Transaction(
         account_id=txn.account_id,
         description=txn.description,
-        amount=txn.amount,
-        category=category
+        amount=txn.amount_usd,
+        category=category,
+        currency=txn.currency
     )
     db.add(new_txn)
     db.commit()

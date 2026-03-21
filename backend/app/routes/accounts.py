@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Account
 from app.schemas import AccountCreate, AccountResponse
+from app.services.currency_service import currency_service
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -19,7 +20,20 @@ def get_accounts(
     db: Session = Depends(get_db)
 ):
     """Get all accounts for a user"""
-    return db.query(Account).filter(Account.user_id == user_id).all()
+    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    rate = currency_service.get_usd_to_inr_rate()
+    return [
+        AccountResponse(
+            id=a.id,
+            user_id=a.user_id,
+            bank_name=a.bank_name,
+            account_type=a.account_type,
+            balance_usd=float(a.balance),
+            currency=getattr(a, 'currency', 'USD'),
+            balance_inr=currency_service.convert_usd_to_inr(float(a.balance)),
+            usd_to_inr_rate=rate
+        ) for a in accounts
+    ]
 
 @router.post("/", response_model=AccountResponse)
 def create_account(account: AccountCreate, db: Session = Depends(get_db)):
@@ -28,7 +42,8 @@ def create_account(account: AccountCreate, db: Session = Depends(get_db)):
         user_id=account.user_id,
         bank_name=account.bank_name,
         account_type=account.account_type,
-        balance=account.balance
+        balance=account.balance_usd,
+        currency='USD'
     )
     db.add(new_account)
     db.commit()

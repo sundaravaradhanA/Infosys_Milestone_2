@@ -13,6 +13,7 @@ class Transaction(Base):
     category = Column(String, nullable=True, index=True)
     amount = Column(Numeric(12, 2))  # NUMERIC for financial precision
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    currency = Column(String(3), default='USD', index=True)
     
     # Relationships
     account = relationship("Account", back_populates="transactions")

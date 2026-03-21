@@ -231,8 +231,8 @@ function Transactions() {
     txn.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalIncome = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) => sum + t.amount_inr, 0);
+  const totalExpense = transactions.filter(t => t.amount_usd < 0).reduce((sum, t) => sum + Math.abs(t.amount_inr), 0);
 
   if (loading) {
     return (
@@ -359,10 +359,10 @@ function Transactions() {
                         )}
                       </td>
                       <td className="py-3 pr-4 text-right">
-                        <span className={`font-display font-bold text-lg ${
-                          txn.amount >= 0 ? "text-success-600" : "text-danger-600"
+<span className={`font-display font-bold text-lg ${
+                          txn.amount_usd >= 0 ? "text-success-600" : "text-danger-600"
                         }`}>
-                          {txn.amount >= 0 ? '+' : '-'}{formatAmount(txn.amount)}
+                          {txn.amount_usd >= 0 ? '+' : '-'}₹{formatAmount(txn.amount_inr)}
                         </span>
                       </td>
                     </tr>
@@ -386,10 +386,10 @@ function Transactions() {
                 <p className="text-sm text-dark-500 mb-1">Description</p>
                 <p className="font-semibold text-dark-800 mb-3">{selectedTxn.description}</p>
                 <p className="text-sm text-dark-500 mb-1">Amount</p>
-                <p className={`font-display font-bold text-xl ${
-                  selectedTxn.amount >= 0 ? "text-success-600" : "text-danger-600"
+<p className={`font-display font-bold text-xl ${
+                  selectedTxn.amount_usd >= 0 ? "text-success-600" : "text-danger-600"
                 }`}>
-                  {selectedTxn.amount >= 0 ? '+' : '-'}₹{Math.abs(selectedTxn.amount)}
+                  {selectedTxn.amount_usd >= 0 ? '+' : '-'}₹{Math.abs(selectedTxn.amount_inr)}
                 </p>
               </div>
 

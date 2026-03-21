@@ -14,6 +14,7 @@ class Budget(Base):
     limit_amount = Column(Numeric(12, 2))  # NUMERIC for financial precision
     spent_amount = Column(Numeric(12, 2), default=0)
     month = Column(String, index=True)  # e.g., "2024-01"
+    currency = Column(String(3), default='USD', index=True)
     
     # Relationships
     user = relationship("User", back_populates="budgets")

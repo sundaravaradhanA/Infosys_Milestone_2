@@ -13,6 +13,7 @@ class Bill(Base):
     due_date = Column(DateTime)
     is_paid = Column(Boolean, default=False)
     category = Column(String)
+    currency = Column(String(3), default='USD', index=True)
     
     # Relationships
     user = relationship("User", back_populates="bills")

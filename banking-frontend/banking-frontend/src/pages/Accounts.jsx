@@ -108,7 +108,7 @@ function Accounts() {
     }
   };
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance_inr, 0);
 
   return (
     <div className="space-y-6 animate-fade-in">

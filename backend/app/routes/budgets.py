@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models import Budget, Transaction, Account, Alert
 from app.schemas import BudgetCreate, BudgetResponse, BudgetUpdate
 from app.schemas.budget import BudgetWithProgress
+from app.services.currency_service import currency_service
 
 router = APIRouter()
 
@@ -65,10 +66,17 @@ def get_budgets(
         limit_amount = float(budget.limit_amount) if budget.limit_amount else 0
         spent_amount = float(spent) if spent else 0
         
+        rate = currency_service.get_usd_to_inr_rate()
+        
         if limit_amount > 0:
             progress_percentage = (spent_amount / limit_amount) * 100
         else:
             progress_percentage = 0
+        
+        budget_with_progress.currency = 'USD'
+        budget_with_progress.limit_amount_inr = currency_service.convert_usd_to_inr(limit_amount)
+        budget_with_progress.spent_amount_inr = currency_service.convert_usd_to_inr(spent_amount)
+        budget_with_progress.usd_to_inr_rate = rate
         
         is_over_budget = spent_amount > limit_amount
         remaining_amount = limit_amount - spent_amount

@@ -10,6 +10,7 @@ class Account(Base):
     bank_name = Column(String)
     account_type = Column(String)  # Savings, Current, etc.
     balance = Column(Float)
+    currency = Column(String(3), default='USD', index=True)
     
     # Relationships
     user = relationship("User", back_populates="accounts")

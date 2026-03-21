@@ -1,4 +1,4 @@
-h@echo off
+@echo off
 echo ================================================
 echo   Milestone 2 - Digital Banking Application
 echo ================================================
