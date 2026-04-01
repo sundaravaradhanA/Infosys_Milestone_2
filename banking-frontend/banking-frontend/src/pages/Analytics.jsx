@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useEffect, useState } from "react";
 import {
   PieChart,
@@ -18,10 +19,12 @@ import {
   Wallet, 
   PieChart as PieChartIcon, 
   BarChart as BarChartIcon,
+  ArrowUpRight, 
+  ArrowDownRight,
+  Download,
+  FileDown,
   Loader2,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight
+  Calendar
 } from "lucide-react";
 
 const COLORS = [
@@ -37,8 +40,10 @@ const COLORS = [
   "#6366F1", // indigo
 ];
 
+const USD_TO_INR = 84;
+
 function Analytics() {
-  const [transactions, setTransactions] = useState([]);
+  const [monthlySummary, setMonthlySummary] = useState({ total_income: 0, total_expense: 0 });
   const [categoryData, setCategoryData] = useState([]);
   const [topMerchants, setTopMerchants] = useState([]);
   const [burnRate, setBurnRate] = useState(null);
@@ -53,57 +58,36 @@ function Analytics() {
   const fetchData = async () => {
     setLoading(true);
     const token = localStorage.getItem("token");
-    const userId = 1;
+    const userId = localStorage.getItem("user_id") || 1;
 
     try {
-      // Fetch transactions
-      const txnResponse = await fetch(
-        `http://127.0.0.1:8000/transactions/?user_id=${userId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (txnResponse.ok) {
-        const txnData = await txnResponse.json();
-        setTransactions(txnData);
-      }
+      const [categoryRes, merchantsRes, burnRateRes, summaryRes] = await Promise.all([
+        fetchWithAuth(`${API_BASE_URL}/insights/spending-by-category?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetchWithAuth(`${API_BASE_URL}/insights/top-merchants?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetchWithAuth(`${API_BASE_URL}/insights/burn-rate?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetchWithAuth(`${API_BASE_URL}/insights/monthly-summary?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
 
-      // Fetch spending by category with month filter
-      const categoryResponse = await fetch(
-        `http://127.0.0.1:8000/insights/spending-by-category?user_id=${userId}&month=${selectedMonth}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (categoryResponse.ok) {
-        const catData = await categoryResponse.json();
+      if (categoryRes.ok) {
+        const catData = await categoryRes.json();
         const formattedData = catData.map((item, index) => ({
           ...item,
-          // Convert USD amount to INR (using standard 84 rate used elsewhere)
-          amount: item.amount * 84,
+          amount: item.amount * USD_TO_INR,
           color: COLORS[index % COLORS.length],
         }));
         setCategoryData(formattedData);
       }
 
-      // Fetch top merchants
-      const merchantsResponse = await fetch(
-        `http://127.0.0.1:8000/insights/top-merchants?user_id=${userId}&month=${selectedMonth}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (merchantsResponse.ok) {
-        const merchData = await merchantsResponse.json();
-        setTopMerchants(merchData);
+      if (merchantsRes.ok) {
+        setTopMerchants(await merchantsRes.json());
       }
 
-      // Fetch burn rate
-      const burnRateResponse = await fetch(
-        `http://127.0.0.1:8000/insights/burn-rate?user_id=${userId}&month=${selectedMonth}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (burnRateResponse.ok) {
-        const burnData = await burnRateResponse.json();
-        setBurnRate(burnData);
+      if (burnRateRes.ok) {
+        setBurnRate(await burnRateRes.json());
+      }
+
+      if (summaryRes.ok) {
+        setMonthlySummary(await summaryRes.json());
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -111,15 +95,29 @@ function Analytics() {
       setLoading(false);
     }
   };
+ 
+  const handleExportPDF = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/export/insights?format=pdf&month=${selectedMonth}&token=${token}`);
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `financial_report_${selectedMonth}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("PDF Export failed:", err);
+      alert("Failed to generate PDF report");
+    }
+  };
 
-  // Calculate totals
-  const totalExpense = categoryData.reduce((sum, item) => sum + item.amount, 0);
-  
-  // Transactions API returns amount_usd and amount_inr
-  const totalIncome = transactions
-    .filter((t) => t.amount_usd > 0)
-    .reduce((sum, t) => sum + t.amount_inr, 0);
-  
+  // Calculate totals (INR)
+  const totalExpense = monthlySummary.total_expense * USD_TO_INR;
+  const totalIncome = monthlySummary.total_income * USD_TO_INR;
   const netBalance = totalIncome - totalExpense;
 
   const formatAmount = (amount) => {
@@ -161,14 +159,23 @@ function Analytics() {
           <h2 className="text-2xl font-display font-bold text-dark-800">Analytics</h2>
           <p className="text-dark-500 text-sm mt-1">Track your spending patterns and financial insights</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-dark-400" />
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="input-modern py-2 w-auto"
-          />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg"
+          >
+            <FileDown className="w-5 h-5" />
+            Download PDF
+          </button>
+          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-dark-100 shadow-sm">
+            <Calendar className="w-5 h-5 text-dark-400" />
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent border-none outline-none font-bold text-dark-700 w-32"
+            />
+          </div>
         </div>
       </div>
 
@@ -264,7 +271,7 @@ function Analytics() {
         </div>
 
         {categoryData.length > 0 ? (
-          <div style={{ width: "100%", height: 400 }}>
+          <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer>
               {chartType === "pie" ? (
                 <PieChart>
@@ -276,7 +283,7 @@ function Analytics() {
                     label={({ category, percent }) =>
                       `${category}: ${Math.abs(percent * 100).toFixed(0)}%`
                     }
-                    outerRadius={150}
+                    outerRadius={110}
                     fill="#8884d8"
                     dataKey="amount"
                     nameKey="category"
@@ -403,7 +410,7 @@ function Analytics() {
               {topMerchants.slice(0, 5).map((merchant, idx) => (
                 <div key={idx} className="flex justify-between items-center bg-dark-50 p-3 rounded-lg">
                   <span className="font-semibold text-dark-700">{merchant.merchant}</span>
-                  <span className="font-bold text-danger-600">{formatAmount(merchant.total_spent * usdToInr)}</span>
+                  <span className="font-bold text-danger-600">{formatAmount(merchant.total_spent * USD_TO_INR)}</span>
                 </div>
               ))}
             </div>
@@ -432,9 +439,9 @@ function Analytics() {
                 </div>
               </div>
               <div>
-                <p className="text-dark-600">Total Budget: <span className="font-bold">{formatAmount(burnRate.total_budget * usdToInr)}</span></p>
-                <p className="text-dark-600">Spent: <span className="font-bold text-danger-600">{formatAmount(burnRate.total_spent * usdToInr)}</span></p>
-                <p className="mt-2 text-sm text-dark-500">Projected Monthly: {formatAmount(burnRate.projected_monthly * usdToInr)}</p>
+                <p className="text-dark-600">Total Budget: <span className="font-bold">{formatAmount(burnRate.total_budget * USD_TO_INR)}</span></p>
+                <p className="text-dark-600">Spent: <span className="font-bold text-danger-600">{formatAmount(burnRate.total_spent * USD_TO_INR)}</span></p>
+                <p className="mt-2 text-sm text-dark-500">Projected Monthly: {formatAmount(burnRate.projected_monthly * USD_TO_INR)}</p>
               </div>
             </div>
           ) : (

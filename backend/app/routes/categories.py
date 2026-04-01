@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -18,13 +19,13 @@ def get_predefined_categories():
     return PREDEFINED_CATEGORIES
 
 @router.get("/categories/rules", response_model=List[CategoryRuleResponse])
-def get_category_rules(db: Session = Depends(get_db), user_id: int = 1):
+def get_category_rules(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     """Get all category rules for a user"""
     rules = db.query(CategoryRule).filter(CategoryRule.user_id == user_id).all()
     return rules
 
 @router.post("/categories/rules", response_model=CategoryRuleResponse)
-def create_category_rule(rule: CategoryRuleCreate, db: Session = Depends(get_db), user_id: int = 1):
+def create_category_rule(rule: CategoryRuleCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     """Create a new category rule"""
     new_rule = CategoryRule(
         user_id=user_id,

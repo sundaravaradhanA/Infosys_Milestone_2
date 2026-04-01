@@ -32,7 +32,6 @@ def run_fix():
     indexes = [
         ("accounts",       "ix_accounts_user_id",           "CREATE INDEX IF NOT EXISTS ix_accounts_user_id ON accounts(user_id)"),
         ("bills",          "ix_bills_user_id",              "CREATE INDEX IF NOT EXISTS ix_bills_user_id ON bills(user_id)"),
-        ("bills",          "ix_bills_currency",             "CREATE INDEX IF NOT EXISTS ix_bills_currency ON bills(currency)"),
         ("rewards",        "ix_rewards_user_id",            "CREATE INDEX IF NOT EXISTS ix_rewards_user_id ON rewards(user_id)"),
         ("transactions",   "ix_transactions_account_id",    "CREATE INDEX IF NOT EXISTS ix_transactions_account_id ON transactions(account_id)"),
         ("transactions",   "ix_transactions_created_at",    "CREATE INDEX IF NOT EXISTS ix_transactions_created_at ON transactions(created_at DESC)"),
@@ -89,12 +88,49 @@ def run_fix():
         user_accounts[uid].append({"id": row[0], "bank": row[2], "balance": row[3]})
     
     # ----------------------------------------------------------------
+    # STEP 3.5: Drop tables which have changed schema
+    # ----------------------------------------------------------------
+    print("\n[3.5/5] Recreating tables with updated schemas...")
+    try:
+        cur.execute("DROP TABLE IF EXISTS bills CASCADE;")
+        cur.execute("""
+            CREATE TABLE bills (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                biller_name VARCHAR NOT NULL,
+                due_date DATE NOT NULL,
+                amount_due NUMERIC(10,2) NOT NULL CHECK (amount_due > 0),
+                status VARCHAR DEFAULT 'upcoming',
+                auto_pay BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("CREATE INDEX ix_bills_user_id ON bills(user_id);")
+        cur.execute("CREATE INDEX ix_bills_status ON bills(status);")
+
+        cur.execute("DROP TABLE IF EXISTS rewards CASCADE;")
+        cur.execute("""
+            CREATE TABLE rewards (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                program_name VARCHAR NOT NULL,
+                points_balance INTEGER DEFAULT 0,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("CREATE INDEX ix_rewards_user_id ON rewards(user_id);")
+        conn.commit()
+        print("  ✓ Refreshed db schema for Bills and Rewards")
+    except Exception as e:
+        conn.rollback()
+        print(f"  Error refreshing tables: {e}")
+
+    # ----------------------------------------------------------------
     # STEP 4: Seed per-user data for each user
     # ----------------------------------------------------------------
     print("\n[4/5] Seeding per-user isolated data...")
     
     current_month = datetime.now().strftime("%Y-%m")
-    prev_month = (datetime.now().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     
     # Category definitions for budgets
     budget_categories = [
@@ -107,37 +143,20 @@ def run_fix():
     
     # Bill definitions per user (will be varied by user)
     bill_templates = [
-        ("Electricity Bill", 85.00,  "Utilities"),
-        ("Internet Plan",    55.00,  "Utilities"),
-        ("Netflix",          15.99,  "Entertainment"),
-        ("Mobile Recharge",  25.00,  "Utilities"),
+        ("Electricity Bill", 85.00),
+        ("Internet Plan",    55.00),
+        ("Netflix",          15.99),
+        ("Mobile Recharge",  25.00),
     ]
     
     # Category rules (system-wide, will be seeded per user)
     rule_templates = [
         ("Food & Dining",    "swiggy",     None,         10),
         ("Food & Dining",    "zomato",     None,         10),
-        ("Food & Dining",    "restaurant", None,         8),
-        ("Food & Dining",    "cafe",       None,         7),
-        ("Transport",        "uber",       None,         10),
-        ("Transport",        "ola",        None,         10),
-        ("Transport",        "metro",      None,         9),
-        ("Transport",        "petrol",     None,         8),
-        ("Transport",        "fuel",       None,         8),
         ("Shopping",         "amazon",     None,         10),
-        ("Shopping",         "flipkart",   None,         10),
-        ("Shopping",         "myntra",     None,         9),
         ("Entertainment",    "netflix",    None,         10),
-        ("Entertainment",    "spotify",    None,         10),
-        ("Entertainment",    "movie",      None,         8),
         ("Utilities",        "electricity",None,         9),
-        ("Utilities",        "internet",   None,         9),
-        ("Utilities",        "water",      None,         8),
-        ("Healthcare",       "pharmacy",   None,         9),
-        ("Healthcare",       "hospital",   None,         9),
-        ("Healthcare",       "medical",    None,         8),
         ("Salary",           "salary",     None,         10),
-        ("Salary",           "payroll",    None,         10),
     ]
 
     for user in users:
@@ -153,7 +172,6 @@ def run_fix():
             """, (uid, cat, current_month))
             exists = cur.fetchone()
             if not exists:
-                # Vary amounts slightly per user
                 factor = 0.8 + (uid % 5) * 0.1
                 cur.execute("""
                     INSERT INTO budgets (user_id, category, limit_amount, spent_amount, month, currency)
@@ -165,35 +183,38 @@ def run_fix():
         
         # b) BILLS — seed 2-3 bills per user
         due_base = datetime.now().replace(day=1) + timedelta(days=random.randint(5, 25))
-        for i, (bill_name, amount, category) in enumerate(bill_templates[:3]):
+        for i, (biller_name, amount) in enumerate(bill_templates[:3]):
             cur.execute("""
                 SELECT id FROM bills 
-                WHERE user_id = %s AND bill_name = %s
-            """, (uid, bill_name))
+                WHERE user_id = %s AND biller_name = %s
+            """, (uid, biller_name))
             exists = cur.fetchone()
             if not exists:
                 due = due_base + timedelta(days=i * 7)
                 factor = 0.85 + (uid % 5) * 0.08
+                status = "upcoming"
+                if due.date() < datetime.now().date():
+                    status = "overdue"
+
                 cur.execute("""
-                    INSERT INTO bills (user_id, bill_name, amount, due_date, is_paid, category, currency)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (uid, bill_name, round(amount * factor, 2), due, False, category, 'USD'))
-                print(f"    ✓ Bill seeded: {bill_name}")
+                    INSERT INTO bills (user_id, biller_name, amount_due, due_date, status, auto_pay)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (uid, biller_name, round(amount * factor, 2), due, status, False))
+                print(f"    ✓ Bill seeded: {biller_name}")
             else:
-                print(f"    ~ Bill exists: {bill_name}")
+                print(f"    ~ Bill exists: {biller_name}")
         
         # c) REWARDS — seed 1 reward per user
         cur.execute("SELECT id FROM rewards WHERE user_id = %s", (uid,))
         existing_rewards = cur.fetchall()
         if len(existing_rewards) == 0:
             cur.execute("""
-                INSERT INTO rewards (user_id, points, description, earned_date, expires_date)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO rewards (user_id, program_name, points_balance, last_updated)
+                VALUES (%s, %s, %s, %s)
             """, (uid, 
-                  100 + (uid * 13 % 400),
-                  "Welcome Bonus — Account Opening Reward",
-                  datetime.now() - timedelta(days=random.randint(1, 30)),
-                  datetime.now() + timedelta(days=365)))
+                  "Bank Pro Default Rewards",
+                  1500 + (uid * 13 % 400),
+                  datetime.now()))
             print(f"    ✓ Reward seeded")
         else:
             print(f"    ~ Rewards exist ({len(existing_rewards)})")
@@ -202,22 +223,13 @@ def run_fix():
         cur.execute("SELECT COUNT(*) FROM alerts WHERE user_id = %s", (uid,))
         alert_count = cur.fetchone()[0]
         if alert_count < 2:
-            # Welcome alert
             cur.execute("""
                 INSERT INTO alerts (user_id, title, message, alert_type, is_read, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (uid,
                   "Welcome to Digital Banking!",
                   f"Hello {uname}, your account is active and ready to use.",
-                  "info", False, datetime.now() - timedelta(days=random.randint(1, 10))))
-            # Budget reminder alert
-            cur.execute("""
-                INSERT INTO alerts (user_id, title, message, alert_type, is_read, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (uid,
-                  "Monthly Budget Set",
-                  f"Your budgets for {current_month} have been configured. Track your spending in the Budget section.",
-                  "info", False, datetime.now()))
+                  "info", False, datetime.now() - timedelta(days=1)))
             print(f"    ✓ Alerts seeded (was {alert_count})")
         else:
             print(f"    ~ Alerts exist ({alert_count})")
@@ -225,7 +237,7 @@ def run_fix():
         # e) CATEGORY RULES — seed per-user rules
         cur.execute("SELECT COUNT(*) FROM category_rules WHERE user_id = %s", (uid,))
         rule_count = cur.fetchone()[0]
-        if rule_count < 5:
+        if rule_count < 2:
             for category, keyword, merchant, priority in rule_templates:
                 cur.execute("""
                     SELECT id FROM category_rules 
@@ -271,17 +283,6 @@ def run_fix():
     print("\n" + "=" * 60)
     print("  ✅ ALL FIXES APPLIED SUCCESSFULLY")
     print("=" * 60)
-    print("\nSummary:")
-    print("  • Indexes added on user_id, account_id, created_at, category, currency")
-    print("  • Stale alerts trimmed to last 50 for user_id=1")
-    print("  • Budgets seeded for all users (current month)")
-    print("  • Bills seeded for all users")
-    print("  • Rewards seeded for all users")
-    print("  • Category rules seeded for all users")
-    print("  • Each user now has FULLY ISOLATED data in the DB")
-    print(f"\nLogin credentials:")
-    print(f"  Email:    sundaravaradhanmadurai@gmail.com")
-    print(f"  Password: Sundar@2005")
 
 if __name__ == "__main__":
     run_fix()

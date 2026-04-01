@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Phone, Eye, EyeOff, ArrowRight, Sparkles, Check } from "lucide-react";
@@ -21,7 +22,7 @@ function Register() {
 
     setIsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/users", {
+      const res = await fetchWithAuth(`${API_BASE_URL}/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

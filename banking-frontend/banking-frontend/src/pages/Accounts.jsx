@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useEffect, useState } from "react";
 import { Plus, Wallet, Building2, CreditCard, Trash2, Edit, X, Check, Loader2 } from "lucide-react";
 
@@ -15,8 +16,9 @@ function Accounts() {
   }, []);
 
   const fetchAccounts = () => {
+    const userId = localStorage.getItem("user_id") || 1;
     setLoading(true);
-    fetch("http://127.0.0.1:8000/accounts/?user_id=1")
+    fetchWithAuth(`${API_BASE_URL}/accounts/?user_id=${userId}`)
       .then((res) => res.json())
       .then((data) => {
         setAccounts(data);
@@ -37,13 +39,13 @@ function Accounts() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/accounts/", {
+      const response = await fetchWithAuth(`${API_BASE_URL}/accounts/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: 1,
+          user_id: parseInt(localStorage.getItem("user_id") || 1),
           bank_name: bankName,
           account_type: accountType,
           balance: parseFloat(balance),
@@ -224,7 +226,7 @@ function Accounts() {
                     </td>
                     <td>
                       <span className="font-display font-bold text-brand-600 text-lg">
-                        {formatCurrency(acc.balance)}
+                        {formatCurrency(acc.balance_inr)}
                       </span>
                     </td>
                     <td className="pr-6">

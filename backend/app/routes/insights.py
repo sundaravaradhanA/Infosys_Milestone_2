@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
@@ -10,7 +11,7 @@ router = APIRouter()
 
 @router.get("/spending-by-category")
 def get_spending_by_category(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
@@ -45,7 +46,7 @@ def get_spending_by_category(
 
 @router.get("/income-by-category")
 def get_income_by_category(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
@@ -80,7 +81,7 @@ def get_income_by_category(
 
 @router.get("/monthly-summary")
 def get_monthly_summary(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
@@ -121,7 +122,7 @@ def get_monthly_summary(
 
 @router.get("/category-trend")
 def get_category_trend(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     category: str = Query(..., description="Category to get trend for"),
     months: int = Query(6, description="Number of months to look back"),
     db: Session = Depends(get_db)
@@ -155,7 +156,7 @@ def get_category_trend(
 
 @router.get("/transactions-by-date")
 def get_transactions_by_date(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
@@ -196,7 +197,7 @@ def get_transactions_by_date(
 
 @router.get("/top-merchants")
 def get_top_merchants(
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     limit: int = Query(10),
     month: Optional[str] = Query(None),
     db: Session = Depends(get_db)
@@ -214,17 +215,17 @@ def get_top_merchants(
         Transaction.account_id.in_(account_ids),
         Transaction.amount < 0,
         Transaction.description.isnot(None)
-    ).group_by(Transaction.description).order_by(func.sum(func.abs(Transaction.amount)).desc()).limit(limit)
+    ).group_by(Transaction.description).order_by(func.sum(func.abs(Transaction.amount)).desc())
     
     if month:
         query = query.filter(func.to_char(Transaction.created_at, 'YYYY-MM') == month)
     
-    results = query.all()
+    results = query.limit(limit).all()
     return [{"merchant": r.merchant or "Unknown", "total_spent": float(r.total_spent)} for r in results]
 
 @router.get("/burn-rate")
 def get_burn_rate(
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
@@ -251,3 +252,20 @@ def get_burn_rate(
         "projected_monthly": float(projected),
         "burn_rate_percent": round(burn_rate, 2)
     }
+
+# Aliases for Insights Dashboard
+@router.get("/category-spend")
+def get_category_spend_alias(
+    user_id: int = Depends(get_current_user_id),
+    month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
+    db: Session = Depends(get_db)
+):
+    return get_spending_by_category(user_id=user_id, month=month, db=db)
+
+@router.get("/cashflow")
+def get_cashflow_alias(
+    user_id: int = Depends(get_current_user_id),
+    month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
+    db: Session = Depends(get_db)
+):
+    return get_monthly_summary(user_id=user_id, month=month, db=db)

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../services/api";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles } from "lucide-react";
@@ -18,7 +19,7 @@ function Login() {
 
     setIsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/login", {
+      const res = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -32,6 +33,10 @@ function Login() {
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem("token", data.access_token);
+        if (data.user?.id) {
+          localStorage.setItem("user_id", data.user.id);
+          localStorage.setItem("user_name", data.user.name || "");
+        }
         navigate("/dashboard");
       } else {
         alert("Invalid credentials");

@@ -1,10 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserResponse, UserUpdate
 
 router = APIRouter()
+
+@router.get("/me", response_model=UserResponse)
+def get_current_user(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """Get current authenticated user profile"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(

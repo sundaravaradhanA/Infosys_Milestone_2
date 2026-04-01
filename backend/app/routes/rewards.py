@@ -1,56 +1,46 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from app.dependencies import get_current_user_id
 from app.database import get_db
-from pydantic import BaseModel
-from app.models.user import User
+from app.models.reward import Reward
+from app.schemas.reward import RewardCreate, RewardUpdate, RewardResponse
 
-router = APIRouter(prefix="/api/rewards", tags=["Rewards"])
+router = APIRouter(tags=["Rewards"])
 
-class TotalPoints(BaseModel):
-    total_points: int = 0
+@router.post("/", response_model=RewardResponse)
+def create_reward(reward: RewardCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    if not reward.program_name.strip():
+        raise HTTPException(status_code=400, detail="Program name cannot be empty")
+        
+    new_reward = Reward(
+        user_id=user_id,
+        program_name=reward.program_name,
+        points_balance=reward.points_balance
+    )
+    db.add(new_reward)
+    db.commit()
+    db.refresh(new_reward)
+    return new_reward
 
-class RewardsList(BaseModel):
-    id: int
-    title: str
-    description: str
-    category: str
-    color: str
-    bgColor: str
-    expires: str
-    icon: str
-
-@router.get("/", response_model=List[RewardsList])
-def get_rewards(user_id: int = 1, db: Session = Depends(get_db)):
-    # Sample rewards data
-    rewards = [
-        {
-            "id": 1,
-            "title": "Cashback 5%",
-            "description": "Get 5% cashback on groceries this month",
-            "category": "Cashback",
-            "color": "from-green-400 to-green-600",
-            "bgColor": "bg-green-100 text-green-800",
-            "expires": "2024-12-31",
-            "icon": "💰"
-        },
-        {
-            "id": 2,
-            "title": "Free ATM Withdrawals",
-            "description": "Unlimited free ATM withdrawals until end of month",
-            "category": "Banking",
-            "color": "from-blue-400 to-blue-600",
-            "bgColor": "bg-blue-100 text-blue-800",
-            "expires": "2024-11-30",
-            "icon": "🏧"
-        }
-    ]
+@router.get("/", response_model=list[RewardResponse])
+def get_rewards(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    rewards = db.query(Reward).filter(Reward.user_id == user_id).all()
     return rewards
 
-@router.get("/total-points", response_model=TotalPoints)
-def get_total_points(user_id: int = 1, db: Session = Depends(get_db)):
-    # Calculate points based on transactions/spending (mock)
-    user = db.query(User).filter(User.id == user_id).first()
-    total_points = 1250 if user else 0  # Mock data
-    return TotalPoints(total_points=total_points)
+@router.put("/{reward_id}", response_model=RewardResponse)
+def update_reward(reward_id: int, reward_data: RewardUpdate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    reward = db.query(Reward).filter(Reward.id == reward_id, Reward.user_id == user_id).first()
+    if not reward:
+        raise HTTPException(status_code=404, detail="Reward not found")
+        
+    if reward_data.program_name is not None:
+        if not reward_data.program_name.strip():
+            raise HTTPException(status_code=400, detail="Program name cannot be empty")
+        reward.program_name = reward_data.program_name
+    
+    if reward_data.points_balance is not None:
+        reward.points_balance = reward_data.points_balance
 
+    db.commit()
+    db.refresh(reward)
+    return reward

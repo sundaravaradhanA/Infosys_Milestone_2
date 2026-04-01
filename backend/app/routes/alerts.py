@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Alert
@@ -8,7 +9,7 @@ router = APIRouter()
 
 @router.get("/", response_model=list[AlertResponse])
 def get_alerts(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     unread_only: bool = Query(False, description="Show only unread alerts"),
     db: Session = Depends(get_db)
 ):
@@ -38,7 +39,7 @@ def create_alert(alert: AlertCreate, db: Session = Depends(get_db)):
 @router.patch("/{alert_id}/mark-read")
 def mark_alert_as_read(
     alert_id: int,
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Mark an alert as read"""
@@ -56,7 +57,7 @@ def mark_alert_as_read(
 
 @router.patch("/mark-all-read")
 def mark_all_alerts_as_read(
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Mark all alerts as read for a user"""
@@ -70,7 +71,7 @@ def mark_all_alerts_as_read(
 @router.delete("/{alert_id}")
 def delete_alert(
     alert_id: int,
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Delete an alert"""
@@ -88,7 +89,7 @@ def delete_alert(
 
 @router.get("/unread-count")
 def get_unread_count(
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Get count of unread alerts"""

@@ -33,19 +33,23 @@ class BudgetService:
         if not account_ids:
             return 0.0
         
-        # Parse month string (format: "2024-01")
+        # Parse month string (format: "2024-01" or just "01")
         try:
-            month_int = int(month.split('-')[1])
+            if '-' in month:
+                month_int = int(month.split('-')[1])
+            else:
+                month_int = int(month)
         except (ValueError, IndexError):
             month_int = datetime.now().month
         
+        from sqlalchemy import cast, Integer
         # Query transactions for the category in the specified month/year
         # Only consider negative amounts (debits)
         result = self.db.query(func.sum(Transaction.amount)).filter(
             Transaction.account_id.in_(account_ids),
             Transaction.category == category,
-            func.extract('month', Transaction.created_at) == month_int,
-            func.extract('year', Transaction.created_at) == year,
+            cast(func.extract('month', Transaction.created_at), Integer) == month_int,
+            cast(func.extract('year', Transaction.created_at), Integer) == year,
             Transaction.amount < 0  # Only debits
         ).scalar()
         
@@ -63,18 +67,22 @@ class BudgetService:
             return {}
         
         try:
-            month_int = int(month.split('-')[1])
+            if '-' in month:
+                month_int = int(month.split('-')[1])
+            else:
+                month_int = int(month)
         except (ValueError, IndexError):
             month_int = datetime.now().month
         
+        from sqlalchemy import cast, Integer
         # Query all categories with their total spending
         results = self.db.query(
             Transaction.category,
             func.sum(func.abs(Transaction.amount))
         ).filter(
             Transaction.account_id.in_(account_ids),
-            func.extract('month', Transaction.created_at) == month_int,
-            func.extract('year', Transaction.created_at) == year,
+            cast(func.extract('month', Transaction.created_at), Integer) == month_int,
+            cast(func.extract('year', Transaction.created_at), Integer) == year,
             Transaction.amount < 0,
             Transaction.category.isnot(None)
         ).group_by(Transaction.category).all()

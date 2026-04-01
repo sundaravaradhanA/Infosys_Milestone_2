@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
@@ -49,7 +50,7 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
 
 # GET BILLS
 @router.get("/")
-def get_bills(user_id: int = Query(...), db: Session = Depends(get_db)):
+def get_bills(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
 
     bills = db.query(Bill).filter(Bill.user_id == user_id).all()
 
@@ -117,7 +118,7 @@ def update_bill(
 @router.patch("/{bill_id}/pay")
 def pay_bill(
     bill_id: int,
-    user_id: int = Query(...),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
 
@@ -141,7 +142,7 @@ def pay_bill(
 @router.delete("/{bill_id}")
 def delete_bill(
     bill_id: int,
-    user_id: int = Query(...),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
 

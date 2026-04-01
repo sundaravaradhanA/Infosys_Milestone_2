@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState, useEffect } from "react";
 import { 
   Bell, 
@@ -15,17 +16,18 @@ import {
 function Notifications() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const userId = localStorage.getItem("user_id") || 1;
 
 useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 30000);  // 30s poll
+    const interval = setInterval(() => fetchAlerts(), 60000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchAlerts = async () => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch("http://127.0.0.1:8000/alerts/?user_id=1", {
+      const response = await fetchWithAuth(`${API_BASE_URL}/alerts/?user_id=${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -44,8 +46,8 @@ useEffect(() => {
   const handleMarkAsRead = async (alertId) => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/alerts/${alertId}/mark-read?user_id=1`,
+      const response = await fetchWithAuth(
+        `${API_BASE_URL}/alerts/${alertId}/mark-read?user_id=${userId}`,
         {
           method: "PATCH",
           headers: {
@@ -66,7 +68,7 @@ useEffect(() => {
   const handleMarkAllAsRead = async () => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch("http://127.0.0.1:8000/alerts/mark-all-read?user_id=1", {
+      const response = await fetchWithAuth(`${API_BASE_URL}/alerts/mark-all-read?user_id=${userId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -83,8 +85,8 @@ useEffect(() => {
   const handleDelete = async (alertId) => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/alerts/${alertId}?user_id=1`,
+      const response = await fetchWithAuth(
+        `${API_BASE_URL}/alerts/${alertId}?user_id=${userId}`,
         {
           method: "DELETE",
           headers: {
@@ -118,8 +120,11 @@ useEffect(() => {
     switch (type) {
       case "budget_exceeded":
         return <AlertTriangle className="w-5 h-5" />;
+      case "low_balance":
       case "warning":
         return <AlertCircle className="w-5 h-5" />;
+      case "bill_due":
+        return <Info className="w-5 h-5" />;
       case "error":
         return <XCircle className="w-5 h-5" />;
       case "info":
@@ -150,6 +155,7 @@ useEffect(() => {
           titleColor: "text-danger-800",
           textColor: "text-danger-700"
         };
+      case "low_balance":
       case "warning":
         return {
           bg: "bg-warning-50",
@@ -158,6 +164,15 @@ useEffect(() => {
           iconColor: "text-warning-600",
           titleColor: "text-warning-800",
           textColor: "text-warning-700"
+        };
+      case "bill_due":
+        return {
+          bg: "bg-brand-50",
+          border: "border-brand-200",
+          iconBg: "bg-brand-100",
+          iconColor: "text-brand-600",
+          titleColor: "text-brand-800",
+          textColor: "text-brand-700"
         };
       case "error":
         return {
@@ -228,7 +243,7 @@ useEffect(() => {
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-dark-100 flex items-center justify-center">
               <BellOff className="w-10 h-10 text-dark-400" />
             </div>
-            <h3 className="text-lg font-semibold text-dark-700 mb-2">No notifications yet</h3>
+            <h3 className="text-lg font-semibold text-dark-700 mb-2">No alerts yet</h3>
             <p className="text-dark-500 text-sm max-w-sm mx-auto">
               You're all caught up! We'll notify you when there's something new.
             </p>
@@ -242,7 +257,7 @@ useEffect(() => {
                   key={alert.id}
                   className={`p-5 transition-all duration-200 hover:bg-dark-50 ${styles.bg} ${!alert.is_read ? 'border-l-4' : ''}`}
                   style={{ 
-                    borderLeftColor: !alert.is_read ? (alert.alert_type === 'budget_exceeded' || alert.alert_type === 'error' ? '#EF4444' : alert.alert_type === 'warning' ? '#F59E0B' : '#0EA5E9') : 'transparent',
+                    borderLeftColor: !alert.is_read ? (alert.alert_type === 'budget_exceeded' || alert.alert_type === 'error' ? '#EF4444' : (alert.alert_type === 'warning' || alert.alert_type === 'low_balance') ? '#F59E0B' : '#0EA5E9') : 'transparent',
                     animationDelay: `${index * 50}ms`
                   }}
                 >

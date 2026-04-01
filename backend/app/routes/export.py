@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
+from app.dependencies import get_current_user_id
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,7 +21,7 @@ router = APIRouter(tags=["Export"])
 @router.get("/transactions")
 def export_transactions(
     format: str = Query("csv"),
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
@@ -64,7 +65,7 @@ def export_transactions(
 @router.get("/insights")
 def export_insights(
     format: str = Query("pdf"),
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):

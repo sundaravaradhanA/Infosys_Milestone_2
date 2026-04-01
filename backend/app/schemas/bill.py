@@ -1,28 +1,28 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
-
+from datetime import date, datetime
+from typing import Optional
 
 class BillBase(BaseModel):
-    bill_name: str = Field(..., min_length=1, description="Name of the bill")
-    amount_usd: float = Field(..., gt=0, description="Bill amount USD")
-    due_date: str = Field(..., description="ISO date string YYYY-MM-DD")
-
-
+    biller_name: str = Field(..., min_length=1, description="Name of the biller")
+    amount_due: float = Field(..., gt=0, description="Amount due in numeric")
+    due_date: date = Field(..., description="Due date of the bill YYYY-MM-DD")
+    auto_pay: bool = Field(default=False, description="Enable auto pay")
 
 class BillCreate(BillBase):
-    user_id: int
+    pass
 
+class BillUpdate(BaseModel):
+    biller_name: Optional[str] = None
+    amount_due: Optional[float] = None
+    due_date: Optional[date] = None
+    auto_pay: Optional[bool] = None
+    status: Optional[str] = None # allowed: upcoming, paid, overdue
 
 class BillResponse(BillBase):
     id: int
     user_id: int
-    currency: str = "USD"
-    amount_inr: float = 0.0
-    usd_to_inr_rate: float = 83.0
     status: str
-    is_paid: bool = False
-    category: str = "Bills"
-
+    created_at: datetime
+    
     class Config:
         from_attributes = True
-

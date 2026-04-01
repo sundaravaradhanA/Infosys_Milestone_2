@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useEffect, useState } from "react";
 import { 
   Search, 
@@ -18,8 +19,10 @@ import {
   Home,
   Heart,
   Plane,
-  DollarSign,
-  ArrowLeftRight
+  DollarSign, 
+  ArrowLeftRight,
+  Download,
+  FileSpreadsheet
 } from "lucide-react";
 
 const PREDEFINED_CATEGORIES = [
@@ -76,11 +79,14 @@ function Transactions() {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("user_id") || 1;
 
-    fetch("http://127.0.0.1:8000/transactions/?user_id=1", {
+    fetchWithAuth(`${API_BASE_URL}/transactions/?user_id=${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -95,13 +101,19 @@ function Transactions() {
         setLoading(false);
       });
 
-    fetch("http://127.0.0.1:8000/categories/rules", {
+    fetchWithAuth(`${API_BASE_URL}/categories/rules`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setRules(data))
       .catch((err) => console.error(err));
   }, []);
+ 
+  const handleExportCSV = () => {
+    const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("user_id") || 1;
+    window.open(`${API_BASE_URL}/export/transactions?format=csv&user_id=${userId}&token=${token}`);
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -134,8 +146,8 @@ function Transactions() {
     const token = localStorage.getItem("token");
     
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/transactions/${selectedTxn.id}/category?save_as_rule=${saveAsRule}`,
+      const response = await fetchWithAuth(
+        `${API_BASE_URL}/transactions/${selectedTxn.id}/category?save_as_rule=${saveAsRule}`,
         {
           method: "PUT",
           headers: {
@@ -157,7 +169,7 @@ function Transactions() {
         
         // Refresh rules if saved as rule
         if (saveAsRule) {
-          const rulesRes = await fetch("http://127.0.0.1:8000/categories/rules", {
+          const rulesRes = await fetchWithAuth(`${API_BASE_URL}/categories/rules`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           const rulesData = await rulesRes.json();
@@ -179,7 +191,7 @@ function Transactions() {
     const keyword = selectedTxn?.description?.split(" ")[0] || "";
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/categories/rules", {
+      const response = await fetchWithAuth(`${API_BASE_URL}/categories/rules`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -209,7 +221,7 @@ function Transactions() {
     
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://127.0.0.1:8000/categories/rules/${ruleId}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/categories/rules/${ruleId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -231,6 +243,12 @@ function Transactions() {
     txn.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
 const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) => sum + t.amount_inr, 0);
   const totalExpense = transactions.filter(t => t.amount_usd < 0).reduce((sum, t) => sum + Math.abs(t.amount_inr), 0);
 
@@ -250,6 +268,13 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
           <h2 className="text-2xl font-display font-bold text-dark-800">Transactions</h2>
           <p className="text-dark-500 text-sm mt-1">View and manage all your transactions</p>
         </div>
+        <button
+          onClick={handleExportCSV}
+          className="flex items-center gap-2 px-4 py-2.5 bg-success-500 hover:bg-success-600 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg"
+        >
+          <FileSpreadsheet className="w-5 h-5" />
+          Export Transactions (CSV)
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -300,7 +325,7 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
                 type="text"
                 placeholder="Search transactions..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 className="input-with-icon pl-10"
               />
             </div>
@@ -320,12 +345,16 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
               <tbody>
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-12 text-dark-500">
-                      No transactions found
+                    <td colSpan={4} className="text-center py-12">
+                      <div className="flex flex-col items-center justify-center text-dark-500">
+                        <ShoppingBag className="w-12 h-12 mb-4 text-dark-200" />
+                        <p className="text-lg font-medium">No transactions available</p>
+                        <p className="text-sm">We couldn't find any transactions for your search.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((txn, index) => (
+                  paginatedTransactions.map((txn, index) => (
                     <tr
                       key={txn.id}
                       className={`cursor-pointer transition-all duration-200 ${
@@ -371,6 +400,32 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
               </tbody>
             </table>
           </div>
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between p-4 border-t border-dark-100 bg-white">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="px-4 py-2 bg-dark-50 text-dark-600 rounded-lg hover:bg-dark-100 disabled:opacity-50 transition-colors"
+                title="Previous Page"
+              >
+                Previous
+              </button>
+              <div className="flex gap-1">
+                <span className="text-sm font-medium text-dark-500">
+                  Page {currentPage} of {totalPages}
+                </span>
+              </div>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="px-4 py-2 bg-dark-50 text-dark-600 rounded-lg hover:bg-dark-100 disabled:opacity-50 transition-colors"
+                title="Next Page"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Panel - Category Editor */}

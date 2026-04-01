@@ -1,3 +1,4 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState, useEffect } from "react";
 import { 
   Plus, 
@@ -60,8 +61,8 @@ function CalendarView({ transactions, month }) {
   const getDaySpending = (day) => {
     if (!transactionsByDay[day]) return 0;
     return transactionsByDay[day]
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      .filter(t => (t.amount_usd ?? t.amount_inr) < 0)
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount_inr ?? 0)), 0);
   };
   
   const prevMonth = () => {
@@ -165,12 +166,13 @@ function Budget() {
     const fetchBudgets = async () => {
       const token = localStorage.getItem("token");
       try {
-        const url = `http://127.0.0.1:8000/budgets/?user_id=1`;  // All budgets, no month filter
+        const userId = localStorage.getItem("user_id") || 1;
+        const url = `${API_BASE_URL}/budgets/?user_id=${userId}`;  // All budgets, no month filter
         const headers = {};
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
-        const response = await fetch(url, { headers }).catch(err => {
+        const response = await fetchWithAuth(url, { headers }).catch(err => {
           console.error('Budgets fetch failed:', err);
           return { ok: false };
         });
@@ -193,7 +195,8 @@ function Budget() {
   const fetchTransactions = async () => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://127.0.0.1:8000/transactions/?user_id=1`, {
+      const userId = localStorage.getItem("user_id") || 1;
+      const response = await fetchWithAuth(`${API_BASE_URL}/transactions/?user_id=${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -223,25 +226,26 @@ function Budget() {
     const token = localStorage.getItem("token");
     
     const payload = {
-      user_id: 1,
+      user_id: parseInt(localStorage.getItem("user_id") || 1),
       category: formData.category,
       limit_amount: parseFloat(formData.limit_amount),
       month: formData.month
     };
 
     try {
-      let url = "http://127.0.0.1:8000/budgets/";
+      let url = `${API_BASE_URL}/budgets/`;
       let method = "POST";
 
       if (editingBudget) {
-        url = `http://127.0.0.1:8000/budgets/${editingBudget.id}?user_id=1`;
+        const userId = localStorage.getItem("user_id") || 1;
+        url = `${API_BASE_URL}/budgets/${editingBudget.id}?user_id=${userId}`;
         method = "PUT";
         payload.category = formData.category;
         payload.limit_amount = parseFloat(formData.limit_amount);
         payload.month = formData.month;
       }
 
-      const response = await fetch(url, {
+      const response = await fetchWithAuth(url, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -284,7 +288,8 @@ function Budget() {
     
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://127.0.0.1:8000/budgets/${budgetId}?user_id=1`, {
+      const userId = localStorage.getItem("user_id") || 1;
+      const response = await fetchWithAuth(`${API_BASE_URL}/budgets/${budgetId}?user_id=${userId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

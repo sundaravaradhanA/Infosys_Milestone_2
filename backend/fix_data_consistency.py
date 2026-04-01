@@ -99,7 +99,7 @@ for row in cur.fetchall():
 # ----------------------------------------------------------------
 # STEP 4: Re-date transactions to current month for budget matching
 # ----------------------------------------------------------------
-print("\n[3/5] Spreading transactions across current month (2026-03)...")
+print("\n[3/5] Spreading transactions across current month (2026-04)...")
 cur.execute("""
     SELECT t.id, t.category, t.amount, a.user_id
     FROM transactions t 
@@ -158,7 +158,7 @@ for uid in users:
             JOIN accounts a ON t.account_id = a.id
             WHERE a.user_id = %s 
               AND t.category = %s
-              AND TO_CHAR(t.created_at, 'YYYY-MM') = '2026-03'
+              AND TO_CHAR(t.created_at, 'YYYY-MM') = '2026-04'
         """, (uid, cat))
         existing = cur.fetchone()[0]
 
@@ -166,7 +166,7 @@ for uid in users:
             for amt, desc in txns[:3]:
                 day = day_counter[uid] % 20 + 1
                 hour = random.randint(9, 20)
-                new_date = datetime(2026, 3, day, hour, random.randint(0, 59))
+                new_date = datetime(2026, 4, day, hour, random.randint(0, 59))
                 cur.execute("""
                     INSERT INTO transactions (account_id, description, amount, category, currency, created_at)
                     VALUES (%s, %s, %s, %s, 'USD', %s)
@@ -174,7 +174,7 @@ for uid in users:
                 day_counter[uid] += 1
 
 conn.commit()
-print(f"  ✓ Realistic transactions seeded for all users for 2026-03")
+print(f"  ✓ Realistic transactions seeded for all users for 2026-04")
 
 # ----------------------------------------------------------------
 # STEP 6: Recalculate budget spent_amounts from ACTUAL transactions

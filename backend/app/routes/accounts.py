@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Account
@@ -16,7 +17,7 @@ class TransferRequest(BaseModel):
 
 @router.get("/", response_model=list[AccountResponse])
 def get_accounts(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Get all accounts for a user"""
@@ -53,7 +54,7 @@ def create_account(account: AccountCreate, db: Session = Depends(get_db)):
 @router.get("/{account_id}", response_model=AccountResponse)
 def get_account(
     account_id: int,
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Get a specific account"""
@@ -70,7 +71,7 @@ def get_account(
 @router.post("/transfer")
 def transfer_between_accounts(
     transfer: TransferRequest,
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Transfer money between accounts"""
@@ -113,7 +114,7 @@ def transfer_between_accounts(
 @router.delete("/{account_id}")
 def delete_account(
     account_id: int,
-    user_id: int = Query(1),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):
     """Delete an account"""

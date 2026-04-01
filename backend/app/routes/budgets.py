@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.dependencies import get_current_user_id
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
@@ -12,7 +13,7 @@ router = APIRouter()
 
 @router.get("/", response_model=list[dict])
 def get_budgets(
-    user_id: int = Query(1, description="User ID"),
+    user_id: int = Depends(get_current_user_id),
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
@@ -100,7 +101,7 @@ def create_budget(budget: BudgetCreate, db: Session = Depends(get_db)):
     return new_budget
 
 @router.put("/{budget_id}", response_model=BudgetResponse)
-def update_budget(budget_id: int, budget: BudgetUpdate, user_id: int = Query(1), db: Session = Depends(get_db)):
+def update_budget(budget_id: int, budget: BudgetUpdate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     """Update an existing budget"""
     db_budget = db.query(Budget).filter(
         Budget.id == budget_id,
@@ -122,7 +123,7 @@ def update_budget(budget_id: int, budget: BudgetUpdate, user_id: int = Query(1),
     return db_budget
 
 @router.delete("/{budget_id}")
-def delete_budget(budget_id: int, user_id: int = Query(1), db: Session = Depends(get_db)):
+def delete_budget(budget_id: int, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     """Delete a budget"""
     db_budget = db.query(Budget).filter(
         Budget.id == budget_id,
@@ -137,7 +138,7 @@ def delete_budget(budget_id: int, user_id: int = Query(1), db: Session = Depends
     return {"message": "Budget deleted successfully"}
 
 @router.post("/recalculate")
-def recalculate_budgets(user_id: int = Query(1), month: Optional[str] = None, db: Session = Depends(get_db)):
+def recalculate_budgets(user_id: int = Depends(get_current_user_id), month: Optional[str] = None, db: Session = Depends(get_db)):
     """Recalculate all budget spending for a user"""
     budgets = db.query(Budget).filter(Budget.user_id == user_id).all()
     

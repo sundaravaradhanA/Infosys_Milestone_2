@@ -1,209 +1,154 @@
+import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState, useEffect } from "react";
-import { 
-  Gift, 
-  Star, 
-  Trophy, 
-  Crown, 
-  Sparkles,
-  ChevronRight,
-  Clock,
-  Zap,
-  Loader2
-} from "lucide-react";
+import { Gift, Star, Clock, Trophy, RefreshCcw, Loader2, Award } from "lucide-react";
 
 function Rewards() {
   const [rewards, setRewards] = useState([]);
-  const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const token = localStorage.getItem("token");
 
-  const tiers = [
-    {
-      name: "Bronze",
-      icon: Star,
-      color: "from-amber-600 to-amber-800",
-      points: "0 - 500",
-      benefits: ["1% cashback", "Birthday reward"]
-    },
-    {
-      name: "Silver",
-      icon: Trophy,
-      color: "from-gray-300 to-gray-500",
-      points: "501 - 2000",
-      benefits: ["2% cashback", "Priority support", "Exclusive offers"]
-    },
-    {
-      name: "Gold",
-      icon: Crown,
-      color: "from-yellow-400 to-yellow-600",
-      points: "2001 - 5000",
-      benefits: ["3% cashback", "Free transactions", "Lounge access"]
-    },
-    {
-      name: "Platinum",
-      icon: Sparkles,
-      color: "from-brand-400 to-brand-600",
-      points: "5000+",
-      benefits: ["5% cashback", "Concierge service", "Premium rewards"]
+  const fetchRewards = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/rewards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch rewards");
+      const data = await res.json();
+      setRewards(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    const fetchRewards = async () => {
-      try {
-        setLoading(true);
-        const [rewardsRes, totalRes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/rewards/?user_id=1", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://127.0.0.1:8000/api/rewards/total-points?user_id=1", {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        ]);
-        if (rewardsRes.ok) {
-          const data = await rewardsRes.json();
-          setRewards(data);
-        }
-        if (totalRes.ok) {
-          const data = await totalRes.json();
-          setTotalPoints(data.total_points || 0);
-        }
-      } catch (err) {
-        setError("Failed to fetch rewards");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchRewards();
   }, [token]);
+
+  const totalPoints = rewards.reduce((sum, r) => sum + r.points_balance, 0);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="card-gradient p-6 text-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <Gift className="w-8 h-8" />
+    <div className="space-y-8 max-w-7xl mx-auto px-4 py-8">
+      {/* Header Section */}
+      <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-800 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
+        {/* Decorative background circles */}
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10 blur-3xl"></div>
+        <div className="absolute bottom-0 right-32 -mb-16 w-48 h-48 rounded-full bg-indigo-500 opacity-20 blur-2xl"></div>
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
+              <Trophy className="w-8 h-8 text-yellow-300" />
             </div>
             <div>
-              <h2 className="text-2xl font-display font-bold">Your Rewards</h2>
-              <p className="text-brand-100 text-sm">Unlock exclusive benefits with Bank Pro</p>
+              <h2 className="text-3xl font-extrabold tracking-tight">Rewards Dashboard</h2>
+              <p className="text-indigo-100 font-medium mt-1">Track your loyalty points across all programs</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-brand-100 text-sm">Total Points</p>
-            <p className="text-4xl font-display font-bold">{totalPoints.toLocaleString()}</p>
+          <div className="bg-black/20 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex flex-col items-center min-w-[200px]">
+            <p className="text-indigo-100 text-sm font-semibold tracking-wider uppercase">Total Points Balance</p>
+            <p className="text-5xl font-extrabold mt-2 tracking-tight text-white flex items-center gap-2">
+              <Star className="w-8 h-8 text-yellow-300 fill-yellow-300" />
+              {totalPoints.toLocaleString()}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Reward Tiers */}
-      <div className="card p-6">
-        <h3 className="text-lg font-display font-bold text-dark-800 mb-4">Reward Tiers</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {tiers.map((tier, index) => (
-            <div 
-              key={tier.name}
-              className="relative p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-lg cursor-pointer group"
-              style={{ 
-                borderColor: index === 1 ? '#0EA5E9' : '#E2E8F0',
-                background: index === 1 ? 'linear-gradient(to bottom, #F0F9FF, white)' : 'white'
-              }}
-            >
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tier.color} flex items-center justify-center mb-3 shadow-lg`}>
-                <tier.icon className="w-6 h-6 text-white" />
-              </div>
-              <h4 className="font-semibold text-dark-800 mb-1">{tier.name}</h4>
-              <p className="text-xs text-dark-500 mb-3">{tier.points} points</p>
-              <ul className="space-y-1">
-                {tier.benefits.map((benefit, i) => (
-                  <li key={i} className="text-xs text-dark-600 flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-brand-500" />
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
-              <ChevronRight className="absolute bottom-4 right-4 w-5 h-5 text-dark-300 group-hover:text-brand-500 transition-colors" />
-            </div>
-          ))}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-xl flex items-center gap-3">
+          <div className="bg-red-100 p-2 rounded-lg">
+            <RefreshCcw className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h4 className="font-bold text-red-900">Error loading rewards</h4>
+            <p className="text-sm">{error}</p>
+          </div>
+          <button onClick={fetchRewards} className="ml-auto bg-white px-4 py-2 rounded-lg font-semibold shadow-sm text-red-700 hover:bg-red-50 transition-colors">
+            Retry
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* Available Rewards */}
-      <div className="card overflow-hidden">
-        <div className="p-6 border-b border-dark-100">
-          <h3 className="text-lg font-display font-bold text-dark-800">Available Rewards</h3>
-          <p className="text-sm text-dark-500">Grab these exciting offers before they expire</p>
+      {/* Rewards Grid */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-gray-900 border-l-4 border-indigo-500 pl-4 py-1">Active Programs</h3>
+          <button onClick={fetchRewards} className="text-gray-500 hover:text-indigo-600 flex items-center gap-2 font-medium transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+            <RefreshCcw className="w-4 h-4" /> Refresh
+          </button>
         </div>
-        
-        <div className="divide-y divide-dark-100">
-          {rewards.map((reward, index) => (
-            <div 
-              key={reward.id}
-              className="p-5 hover:bg-dark-50 transition-all duration-200 group"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="flex items-center gap-4">
-                {/* Icon */}
-                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${reward.color} flex items-center justify-center text-2xl shadow-lg`}>
-                  {reward.icon}
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-semibold text-dark-800">{reward.title}</h4>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${reward.bgColor} text-dark-700`}>
-                      {reward.category}
-                    </span>
-                  </div>
-                  <p className="text-sm text-dark-500 mb-2">{reward.description}</p>
-                  <div className="flex items-center gap-1 text-xs text-dark-400">
-                    <Clock className="w-3 h-3" />
-                    Expires: {reward.expires}
-                  </div>
-                </div>
-                
-                {/* Action */}
-                <button className="px-4 py-2 rounded-xl bg-brand-50 text-brand-600 font-medium text-sm hover:bg-brand-100 transition-colors group-hover:scale-105">
-                  Claim
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* How to Earn */}
-      <div className="card p-6">
-        <h3 className="text-lg font-display font-bold text-dark-800 mb-4">How to Earn More Points</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { title: "Use Bank Card", desc: "Earn 1 point per ₹100 spent", icon: "💳" },
-            { title: "Refer Friends", desc: "Get 500 points per referral", icon: "👥" },
-            { title: "Pay Bills", desc: "Earn 2x points on bill payments", icon: "📄" }
-          ].map((item, index) => (
-            <div key={index} className="p-4 bg-dark-50 rounded-xl hover:bg-dark-100 transition-colors">
-              <div className="text-2xl mb-2">{item.icon}</div>
-              <h4 className="font-semibold text-dark-800 mb-1">{item.title}</h4>
-              <p className="text-sm text-dark-500">{item.desc}</p>
+        {rewards.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-16 text-center">
+            <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Gift className="w-12 h-12 text-indigo-300" />
             </div>
-          ))}
-        </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">No Reward Programs Yet</h3>
+            <p className="text-gray-500 max-w-sm mx-auto">You haven't been enrolled in any reward programs. Earn points by making transactions with partnering services.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {rewards.map((reward, index) => {
+              // Creating a deterministic distinct color for each card based on index
+              const colorSets = [
+                { bg: 'bg-indigo-50', text: 'text-indigo-700', iconBg: 'bg-indigo-100', border: 'border-indigo-100', bar: 'bg-indigo-500' },
+                { bg: 'bg-rose-50', text: 'text-rose-700', iconBg: 'bg-rose-100', border: 'border-rose-100', bar: 'bg-rose-500' },
+                { bg: 'bg-emerald-50', text: 'text-emerald-700', iconBg: 'bg-emerald-100', border: 'border-emerald-100', bar: 'bg-emerald-500' },
+                { bg: 'bg-amber-50', text: 'text-amber-700', iconBg: 'bg-amber-100', border: 'border-amber-100', bar: 'bg-amber-500' }
+              ];
+              const theme = colorSets[index % colorSets.length];
+
+              return (
+                <div key={reward.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                  <div className={`h-2 w-full ${theme.bar}`}></div>
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className={`w-14 h-14 ${theme.bg} ${theme.border} border rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform`}>
+                        <Award className={`w-7 h-7 ${theme.text}`} />
+                      </div>
+                      <span className="bg-gray-100 text-gray-600 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 border border-gray-200">
+                         Active
+                      </span>
+                    </div>
+                    
+                    <h4 className="font-bold text-gray-900 pl-1 text-xl truncate mb-1" title={reward.program_name}>
+                      {reward.program_name}
+                    </h4>
+                    
+                    <div className="mt-8 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                      <p className="text-xs uppercase tracking-wider font-bold text-gray-500 mb-1">Available Points</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-extrabold text-gray-900">{reward.points_balance.toLocaleString()}</span>
+                        <span className="text-sm font-semibold text-gray-400">pts</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex items-center gap-2 text-xs font-medium text-gray-400 pl-1">
+                      <Clock className="w-4 h-4" />
+                      Updated: {new Date(reward.last_updated).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 export default Rewards;
-

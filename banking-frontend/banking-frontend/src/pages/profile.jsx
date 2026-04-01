@@ -1,3 +1,4 @@
+import { fetchWithAuth } from "../services/api";
 import React, { useEffect, useState } from "react";
 import { 
   User, 
@@ -26,7 +27,8 @@ function Profile() {
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    fetch("http://localhost:8000/1", {
+    const userId = localStorage.getItem("user_id") || 1;
+    fetchWithAuth(`http://localhost:8000/users/${userId}`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -44,7 +46,8 @@ function Profile() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await fetch("http://localhost:8000/1", {
+      const userId = localStorage.getItem("user_id") || 1;
+      await fetchWithAuth(`http://localhost:8000/users/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
