@@ -13,7 +13,19 @@ function Accounts() {
   const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
-    fetchAccounts();
+    fetchAccounts(); // Initial load
+
+    // Global listener for instant reflex
+    const handleRefresh = () => fetchAccounts();
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s)
+    const interval = setInterval(fetchAccounts, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchAccounts = () => {
@@ -67,7 +79,8 @@ function Accounts() {
       setSuccessMsg("Account added successfully!");
       setTimeout(() => setSuccessMsg(""), 3000);
       fetchAccounts();
-
+      // Trigger global live refresh
+      window.dispatchEvent(new Event("app-data-updated"));
     } catch (error) {
       console.error(error);
       alert(`Error adding account: ${error.message}`);
@@ -82,7 +95,11 @@ function Accounts() {
       const response = await fetchWithAuth(`${API_BASE_URL}/accounts/${accountId}`, {
         method: "DELETE",
       });
-      if (response.ok) fetchAccounts();
+      if (response.ok) {
+        fetchAccounts();
+        // Trigger global live refresh
+        window.dispatchEvent(new Event("app-data-updated"));
+      }
     } catch (err) {
       console.error(err);
     }

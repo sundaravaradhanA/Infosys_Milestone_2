@@ -98,6 +98,22 @@ function Insights() {
     }
   };
 
+  useEffect(() => {
+    fetchData(); // Initial load
+
+    // Listen for global data updates (instant reflex)
+    const handleRefresh = () => fetchData();
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s interval)
+    const interval = setInterval(fetchData, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
+  }, [selectedMonth]);
+
   // Calculate totals (INR)
   const totalExpense = (cashflow.total_expense || 0) * USD_TO_INR;
   const totalIncome = (cashflow.total_income || 0) * USD_TO_INR;
@@ -144,256 +160,336 @@ function Insights() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-10">
+      {/* --- Refined Header --- */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-dark-100 pb-8">
         <div>
-          <h2 className="text-2xl font-display font-bold text-dark-800">Insights</h2>
-          <p className="text-dark-500 text-sm mt-1">Deep dive into your spending habits and budget health</p>
+          <nav className="flex items-center gap-2 text-dark-400 text-xs font-bold uppercase tracking-widest mb-2">
+            <PieChartIcon className="w-4 h-4" />
+            <span>Financial Analytics</span>
+          </nav>
+          <h2 className="text-4xl font-display font-black text-dark-800 tracking-tight">
+            Insights <span className="text-brand-500">&</span> Trends
+          </h2>
+          <p className="text-dark-500 text-base mt-2 max-w-lg">
+            A comprehensive look at your financial health, identifying patterns to help you save more.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        
+        <div className="flex flex-wrap items-center gap-4 bg-dark-50/50 p-2 rounded-2xl border border-dark-100">
           <button
             onClick={() => {
               const token = localStorage.getItem("token");
               window.open(`${API_BASE_URL}/export/insights?format=pdf&month=${selectedMonth}&token=${token}`);
             }}
-            className="btn-secondary flex items-center gap-2"
+            className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-xl text-dark-700 font-bold shadow-sm hover:shadow-md transition-all border border-dark-100 hover:text-brand-600 group"
           >
-            <FileDown className="w-5 h-5 text-brand-600" />
-            Download Insights Report (PDF)
+            <FileDown className="w-5 h-5 text-brand-500 group-hover:scale-110 transition-transform" />
+            <span>Export Report</span>
           </button>
 
-          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-dark-100 shadow-sm">
+          <div className="h-10 w-px bg-dark-200 hidden md:block mx-2" />
+
+          <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-xl border border-dark-100 shadow-sm focus-within:ring-2 ring-brand-500/20 transition-all">
             <Calendar className="w-5 h-5 text-dark-400" />
             <input
               type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent border-none outline-none font-bold text-dark-700 w-32"
+              className="bg-transparent border-none outline-none font-bold text-dark-700 text-sm cursor-pointer"
             />
           </div>
         </div>
       </div>
 
+      {/* --- Performance Summary Bar --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+           { label: "Gross Income", value: totalIncome, icon: TrendingUp, color: "brand", bg: "from-brand-500/10 to-transparent" },
+           { label: "Total Outflow", value: totalExpense, icon: TrendingDown, color: "danger", bg: "from-danger-500/10 to-transparent" },
+           { label: "Net Surplus", value: netBalance, icon: Wallet, color: netBalance >= 0 ? "success" : "danger", bg: netBalance >= 0 ? "from-success-500/10 to-transparent" : "from-danger-500/10 to-transparent" },
+           { label: "Savings Rate", value: totalIncome > 0 ? (netBalance / totalIncome * 100).toFixed(1) + '%' : '0%', icon: ArrowUpRight, color: "warning", bg: "from-warning-500/10 to-transparent" }
+        ].map((stat, i) => (
+          <div key={i} className={`card group overflow-hidden bg-gradient-to-tr ${stat.bg}`}>
+             <div className="p-6 relative">
+                <div className={`w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-500`}>
+                  <stat.icon className={`w-6 h-6 text-${stat.color === 'success' ? 'brand-600' : stat.color === 'danger' ? 'danger-600' : stat.color === 'brand' ? 'brand-600' : 'warning-600'}`} />
+                </div>
+                <p className="text-dark-500 text-sm font-bold uppercase tracking-wider mb-1">{stat.label}</p>
+                <h3 className="text-2xl font-black text-dark-800 tracking-tight">
+                  {typeof stat.value === 'string' ? stat.value : formatAmount(stat.value)}
+                </h3>
+             </div>
+          </div>
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cashflow Chart */}
-        <div className="card p-6 flex flex-col">
-          <div className="mb-6">
-            <h2 className="text-xl font-display font-bold text-dark-800">
-              Cash Flow
-            </h2>
-            <p className="text-dark-500 text-sm">Income vs Expense for {selectedMonth}</p>
-          </div>
-          <div style={{ width: "100%", height: 320, flex: 1 }}>
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={[{ name: 'Income', amount: totalIncome, fill: '#10B981' }, { name: 'Expense', amount: totalExpense, fill: '#EF4444' }]} margin={{ top: 20, right: 0, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F1F5F9' }} />
-                <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={80}>
-                  {[{ name: 'Income', fill: '#10B981' }, { name: 'Expense', fill: '#EF4444' }].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Category Spending Chart */}
-        <div className="card p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-display font-bold text-dark-800">
-                Spending by Category
-              </h2>
-              <p className="text-dark-500 text-sm">Where your money goes</p>
+      {/* --- Primary Insight Grid --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column (Main Charts) */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* Chart 1: Cash Flow */}
+          <div className="card p-8 bg-white border border-dark-100 shadow-sm hover:shadow-lg transition-all">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h3 className="text-xl font-bold text-dark-800">Income vs. Expenses</h3>
+                <p className="text-dark-500 text-sm mt-1">Comparison of liquidity for the current period</p>
+              </div>
             </div>
-            <div className="flex bg-dark-50 p-1 rounded-xl">
-              <button
-                onClick={() => setChartType("pie")}
-                className={`p-2 rounded-lg transition-all ${
-                  chartType === "pie"
-                    ? "bg-white text-brand-600 shadow-sm"
-                    : "text-dark-400 hover:text-dark-600"
-                }`}
-              >
-                <PieChartIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setChartType("bar")}
-                className={`p-2 rounded-lg transition-all ${
-                  chartType === "bar"
-                    ? "bg-white text-brand-600 shadow-sm"
-                    : "text-dark-400 hover:text-dark-600"
-                }`}
-              >
-                <BarChartIcon className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          
-          <div style={{ width: "100%", height: 320, flex: 1 }}>
-            {categoryData.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-dark-500 italic">No data available</div>
-            ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              {chartType === "pie" ? (
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="amount"
-                    nameKey="category"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend iconType="circle" />
-                </PieChart>
-              ) : (
-                <BarChart data={categoryData} layout="vertical" margin={{ left: 40, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                  <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="category" 
-                    type="category" 
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                  <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[{ name: 'Inflow', amount: totalIncome }, { name: 'Outflow', amount: totalExpense }]} margin={{ top: 20, right: 30, left: 40, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 13, fontWeight: 700 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                  <Bar dataKey="amount" radius={[8, 8, 0, 0]} maxBarSize={100}>
+                    {[{ name: 'Inflow', fill: '#3B82F6' }, { name: 'Outflow', fill: '#F43F5E' }].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 2: Category Breakdown */}
+          <div className="card p-8 bg-white border border-dark-100 shadow-sm hover:shadow-lg transition-all">
+             <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-xl font-bold text-dark-800">Categorical Distribution</h3>
+                <p className="text-dark-500 text-sm mt-1">High-level view of where capital is allocated</p>
+              </div>
+              <div className="flex bg-dark-50 p-1.5 rounded-2xl border border-dark-100">
+                <button
+                  onClick={() => setChartType("pie")}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${chartType === "pie" ? "bg-white text-brand-600 shadow-sm" : "text-dark-400 hover:text-dark-600"}`}
+                >
+                  <PieChartIcon className="w-4 h-4" />
+                  <span>Donut</span>
+                </button>
+                <button
+                  onClick={() => setChartType("bar")}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${chartType === "bar" ? "bg-white text-brand-600 shadow-sm" : "text-dark-400 hover:text-dark-600"}`}
+                >
+                  <BarChartIcon className="w-4 h-4" />
+                  <span>Histogram</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="h-[400px]">
+              {categoryData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-dark-400">
+                   <div className="w-16 h-16 bg-dark-50 rounded-full flex items-center justify-center mb-4">
+                     <PieChartIcon className="w-8 h-8 opacity-20" />
+                   </div>
+                   <p className="italic">No categorical data captured for this range</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {chartType === "pie" ? (
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={100}
+                        outerRadius={150}
+                        paddingAngle={8}
+                        dataKey="amount"
+                        nameKey="category"
+                        stroke="none"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                    </PieChart>
+                  ) : (
+                    <BarChart data={categoryData} layout="vertical" margin={{ left: 20, right: 40, top: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E2E8F0" />
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        dataKey="category" 
+                        type="category" 
+                        tick={{ fill: '#64748B', fontWeight: 700, fontSize: 13 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={100}
+                      />
+                      <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                      <Bar dataKey="amount" radius={[0, 6, 6, 0]} barSize={24}>
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
               )}
-            </ResponsiveContainer>
-            )}
+            </div>
           </div>
         </div>
 
-        {/* Top Merchants List — moved here from Analytics */}
-        <div className="card p-6 flex flex-col h-[420px]">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-              <Store className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-display font-bold text-dark-800">
-                Top Merchants
-              </h2>
-              <p className="text-dark-500 text-sm">Where you spend most often</p>
-            </div>
-          </div>
+        {/* Right Column (Sidebar Cards) */}
+        <div className="lg:col-span-4 space-y-8">
           
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {topMerchants.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-dark-500 italic">No merchant data for this month</div>
-            ) : (
-            <div className="space-y-3">
-              {topMerchants.map((merchant, index) => {
-                const merchantName = merchant.merchant || merchant.name || "Unknown";
-                const spentAmt = getMerchantAmount(merchant);
-                const txnCount = merchant.count || merchant.transaction_count || 0;
-                return (
-                  <div key={index} className="flex items-center justify-between p-3 rounded-xl hover:bg-dark-50 transition-colors group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-lg">
-                        {merchantName[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-dark-800 group-hover:text-brand-600 transition-colors">
-                          {merchantName}
-                        </h4>
-                        {txnCount > 0 && (
-                          <p className="text-dark-500 text-xs">{txnCount} transaction{txnCount !== 1 ? 's' : ''}</p>
-                        )}
+          {/* Card: Budget Burn Rate */}
+          <div className="card p-0 bg-white border border-dark-100 shadow-sm flex flex-col min-h-[500px]">
+            <div className="p-8 pb-4">
+               <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-danger-50 flex items-center justify-center">
+                    <Flame className="w-6 h-6 text-danger-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-dark-800">Budget Health</h3>
+                    <p className="text-dark-500 text-xs font-medium">Real-time depletion tracking</p>
+                  </div>
+                </div>
+              </div>
+              
+              {burnRate && burnRate.total_budget > 0 ? (
+                <div className="space-y-8">
+                  {/* Master Gauge */}
+                  <div className="flex flex-col items-center bg-dark-50/50 py-8 rounded-3xl border border-dark-100">
+                    <div className="relative w-40 h-40">
+                      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                        <circle cx="50" cy="50" r="44" fill="none" stroke="#E2E8F0" strokeWidth="8"/>
+                        <circle
+                          cx="50" cy="50" r="44" fill="none"
+                          stroke={burnRate.used_percent >= 100 ? '#F43F5E' : burnRate.used_percent > 75 ? '#F59E0B' : '#3B82F6'}
+                          strokeWidth="8"
+                          strokeDasharray={`${Math.min(burnRate.used_percent, 100) * 2.764} 276.4`}
+                          strokeLinecap="round"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className={`text-4xl font-black ${burnRate.used_percent >= 100 ? 'text-danger-600' : 'text-brand-600'}`}>
+                          {Math.min(Math.round(burnRate.used_percent), 100)}<span className="text-lg opacity-60">%</span>
+                        </span>
+                        <span className="text-[10px] text-dark-400 font-black uppercase tracking-widest mt-1">Budget Burn</span>
                       </div>
                     </div>
-                    <span className="font-bold text-danger-600">
-                      {formatAmount(spentAmt)}
-                    </span>
+                    
+                    <div className="grid grid-cols-2 gap-8 mt-6 w-full px-8">
+                      <div className="text-center">
+                        <p className="text-dark-400 text-[10px] uppercase font-black tracking-widest mb-1">Threshold</p>
+                        <p className="text-dark-800 font-bold">{formatAmount(burnRate.total_budget * USD_TO_INR)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-dark-400 text-[10px] uppercase font-black tracking-widest mb-1">Consumption</p>
+                        <p className="text-danger-600 font-bold">{formatAmount(burnRate.total_spent * USD_TO_INR)}</p>
+                      </div>
+                    </div>
                   </div>
-                );
-              })}
+
+                  {/* Category Drilldown List */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-dark-100 pb-3">
+                      <h4 className="text-sm font-black text-dark-800 uppercase tracking-widest">Category Insight</h4>
+                      <span className="text-[10px] bg-brand-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">LIVE</span>
+                    </div>
+                    <div className="space-y-6 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
+                      {burnRate.categories?.map((cat, idx) => (
+                        <div key={idx} className="group">
+                          <div className="flex justify-between items-end mb-2">
+                            <div>
+                               <p className="text-sm font-bold text-dark-800 leading-tight mb-0.5">{cat.category}</p>
+                               <p className="text-[10px] text-dark-400 font-bold">{formatAmount(cat.spent * USD_TO_INR)} of {formatAmount(cat.limit * USD_TO_INR)}</p>
+                            </div>
+                            <span className={`text-xs font-black ${cat.used_percent >= 100 ? 'text-danger-600' : 'text-dark-700'}`}>
+                              {cat.used_percent}%
+                            </span>
+                          </div>
+                          <div className="h-2 w-full bg-dark-50 rounded-full overflow-hidden border border-dark-100">
+                             <div 
+                                className={`h-full rounded-full transition-all duration-700 ${cat.used_percent >= 100 ? 'bg-danger-500' : cat.used_percent > 75 ? 'bg-warning-500' : 'bg-brand-500'}`}
+                                style={{ width: `${Math.min(cat.used_percent, 100)}%` }}
+                             />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+                   <Flame className="w-12 h-12 text-dark-100 mb-4" />
+                   <p className="text-dark-500 font-medium italic">No active budget tracks found for this period.</p>
+                   <button className="text-brand-600 font-bold text-sm mt-4 hover:underline">Create a budget now →</button>
+                </div>
+              )}
             </div>
+            
+            {/* Projected Info Footer */}
+            {burnRate && burnRate.total_budget > 0 && (
+              <div className="mt-auto bg-brand-600 p-8 rounded-b-[2rem]">
+                 <div className="flex items-center gap-4 text-white">
+                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">Monthly Projection</p>
+                      <p className="text-xl font-black leading-tight">
+                        {formatAmount(burnRate.projected_monthly * USD_TO_INR)}
+                      </p>
+                    </div>
+                 </div>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Budget Burn Rate — moved here from Analytics */}
-        <div className="card p-6 flex flex-col justify-center h-[420px]">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-              <Flame className="w-5 h-5 text-red-600" />
+          {/* Card: Top Merchants */}
+          <div className="card p-8 bg-white border border-dark-100 shadow-sm flex flex-col max-h-[550px]">
+            <div className="flex items-center gap-4 mb-8">
+               <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center">
+                 <Store className="w-6 h-6 text-orange-600" />
+               </div>
+               <div>
+                  <h3 className="text-xl font-bold text-dark-800">Top Merchants</h3>
+                  <p className="text-dark-500 text-xs font-medium">Where your capital congregates</p>
+               </div>
             </div>
-            <div>
-              <h2 className="text-xl font-display font-bold text-dark-800">Budget Burn Rate</h2>
-              <p className="text-dark-500 text-sm">How fast you're burning your budget</p>
+            
+            <div className="space-y-1 overflow-y-auto pr-2 custom-scrollbar flex-1">
+              {topMerchants.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-dark-300 opacity-50 italic">
+                  <p>No merchant activity logged</p>
+                </div>
+              ) : (
+                topMerchants.map((merchant, index) => {
+                  const mName = merchant.merchant || merchant.name || "Unknown Entity";
+                  const mSpent = getMerchantAmount(merchant);
+                  return (
+                    <div key={index} className="flex items-center justify-between p-4 rounded-2xl hover:bg-brand-50/50 transition-all border border-transparent hover:border-brand-100 group">
+                      <div className="flex items-center gap-4 overflow-hidden">
+                        <div className="w-10 h-10 shrink-0 rounded-2xl bg-dark-50 text-dark-400 group-hover:bg-brand-500 group-hover:text-white transition-all flex items-center justify-center font-black text-lg">
+                          {mName[0].toUpperCase()}
+                        </div>
+                        <div className="overflow-hidden">
+                           <h4 className="font-bold text-dark-800 group-hover:text-brand-600 transition-colors truncate">{mName}</h4>
+                           <div className="flex items-center gap-2 mt-0.5">
+                              <span className="w-1 h-1 bg-dark-300 rounded-full" />
+                              <p className="text-[10px] text-dark-400 font-bold uppercase tracking-widest leading-none">Primary Vendor</p>
+                           </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                         <span className="font-black text-dark-800 text-base">{formatAmount(mSpent)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
-          {burnRate && burnRate.total_budget > 0 ? (
-            <div className="space-y-4 text-center">
-              {/* Circular progress */}
-              <div className="flex justify-center">
-                <div className="relative w-36 h-36">
-                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" strokeWidth="10"/>
-                    <circle
-                      cx="50" cy="50" r="40" fill="none"
-                      stroke={burnRate.used_percent > 100 ? '#ef4444' : burnRate.used_percent > 70 ? '#f59e0b' : '#3b82f6'}
-                      strokeWidth="10"
-                      strokeDasharray={`${Math.min(burnRate.used_percent, 100) * 2.51} 251`}
-                      strokeLinecap="round"
-                      className="transition-all duration-700"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={`text-2xl font-bold ${burnRate.used_percent > 100 ? 'text-danger-600' : burnRate.used_percent > 70 ? 'text-warning-600' : 'text-brand-600'}`}>
-                      {Math.round(burnRate.used_percent)}%
-                    </span>
-                    <span className="text-xs text-dark-400">Used</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between items-center p-3 bg-dark-50 rounded-xl">
-                  <span className="text-dark-600 text-sm font-medium">Total Budget</span>
-                  <span className="font-bold text-dark-800">{formatAmount(burnRate.total_budget * USD_TO_INR)}</span>
-                </div>
-                <div className="w-full bg-dark-100 rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-700 ${burnRate.used_percent > 100 ? 'bg-danger-500' : burnRate.used_percent > 70 ? 'bg-warning-500' : 'bg-brand-500'}`}
-                    style={{ width: `${Math.min(burnRate.used_percent, 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between items-center p-3 bg-danger-50 rounded-xl">
-                  <span className="text-dark-600 text-sm font-medium">Spent</span>
-                  <span className="font-bold text-danger-600">{formatAmount(burnRate.total_spent * USD_TO_INR)}</span>
-                </div>
-                <p className="text-sm text-dark-500 text-center">
-                  Projected Monthly: <span className="font-semibold text-dark-700">{formatAmount(burnRate.projected_monthly * USD_TO_INR)}</span>
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Flame className="w-16 h-16 text-dark-200 mx-auto mb-4" />
-              <p className="text-dark-500 text-sm italic">No active budget for this period.</p>
-              <p className="text-dark-400 text-xs mt-1">Create budgets in the Budget menu to see burn rate.</p>
-            </div>
-          )}
+
         </div>
       </div>
     </div>

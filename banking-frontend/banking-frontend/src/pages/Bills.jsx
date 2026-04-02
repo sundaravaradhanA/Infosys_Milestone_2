@@ -43,7 +43,19 @@ function Bills() {
   };
 
   useEffect(() => {
-    fetchBills();
+    fetchBills(); // Initial load
+
+    // Global listener for instant reflex
+    const handleRefresh = () => fetchBills();
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s)
+    const interval = setInterval(fetchBills, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleSubmit = async (e) => {
@@ -80,6 +92,8 @@ function Bills() {
       setEditingId(null);
       setFormData({ biller_name: '', amount_due: '', due_date: '', auto_pay: false });
       fetchBills();
+      // Notify all components of the update
+      window.dispatchEvent(new Event("app-data-updated"));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,6 +110,8 @@ function Bills() {
       });
       if (!response.ok) throw new Error('Failed to delete');
       fetchBills();
+      // Notify all components of the update
+      window.dispatchEvent(new Event("app-data-updated"));
     } catch (err) {
       setError(err.message);
     }
@@ -109,6 +125,8 @@ function Bills() {
       });
       if (!response.ok) throw new Error('Failed to mark paid');
       fetchBills();
+      // Notify all components of the update
+      window.dispatchEvent(new Event("app-data-updated"));
     } catch (err) {
       setError(err.message);
     }

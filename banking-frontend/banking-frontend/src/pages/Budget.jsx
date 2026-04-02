@@ -162,6 +162,21 @@ function Budget() {
   useEffect(() => {
     fetchBudgets();
     fetchTransactions();
+
+    // Global listener
+    const handleRefresh = () => {
+      fetchBudgets();
+      fetchTransactions();
+    };
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s)
+    const interval = setInterval(handleRefresh, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
   }, [currentMonth]);
 
     const fetchBudgets = async () => {
@@ -264,6 +279,8 @@ function Budget() {
           limit_amount: "",
           month: currentMonth
         });
+        // Dispatch global refresh event
+        window.dispatchEvent(new Event("app-data-updated"));
       } else {
         const error = await response.json();
         alert(error.detail || "Failed to save budget");
@@ -298,6 +315,8 @@ function Budget() {
       });
       if (response.ok) {
         fetchBudgets();
+        // Dispatch global refresh event
+        window.dispatchEvent(new Event("app-data-updated"));
       }
     } catch (err) {
       console.error("Failed to delete budget:", err);

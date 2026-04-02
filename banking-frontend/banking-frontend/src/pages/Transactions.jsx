@@ -84,30 +84,39 @@ function Transactions() {
   const itemsPerPage = 20;
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userId = localStorage.getItem("user_id") || 1;
+    const fetchAllData = async () => {
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("user_id") || 1;
+      const headers = { Authorization: `Bearer ${token}` };
 
-    fetchWithAuth(`${API_BASE_URL}/transactions/?user_id=${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setTransactions(data);
+      try {
+        const [txnRes, rulesRes] = await Promise.all([
+          fetchWithAuth(`${API_BASE_URL}/transactions/?user_id=${userId}`, { headers }),
+          fetchWithAuth(`${API_BASE_URL}/categories/rules`, { headers })
+        ]);
+
+        if (txnRes.ok) setTransactions(await txnRes.json());
+        if (rulesRes.ok) setRules(await rulesRes.json());
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
         setLoading(false);
-      });
+      }
+    };
 
-    fetchWithAuth(`${API_BASE_URL}/categories/rules`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setRules(data))
-      .catch((err) => console.error(err));
+    fetchAllData();
+    
+    // Global listener for instant reflex
+    const handleRefresh = () => fetchAllData();
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s)
+    const interval = setInterval(fetchAllData, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
   }, []);
  
   const handleExportCSV = () => {
@@ -205,6 +214,8 @@ function Transactions() {
         }
         
         alert("Category updated successfully!");
+        // Trigger global live refresh
+        window.dispatchEvent(new Event("app-data-updated"));
       }
     } catch (err) {
       console.error(err);
@@ -259,6 +270,8 @@ function Transactions() {
       if (response.ok) {
         setRules(rules.filter(r => r.id !== ruleId));
         alert("Rule deleted successfully!");
+        // Trigger global live refresh
+        window.dispatchEvent(new Event("app-data-updated"));
       }
     } catch (err) {
       console.error(err);

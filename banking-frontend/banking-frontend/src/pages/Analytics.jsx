@@ -49,7 +49,19 @@ function Analytics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchData(); // Initial load
+
+    // Global listener for instant reflex
+    const handleRefresh = () => fetchData();
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    // Periodic live sync (60s interval)
+    const interval = setInterval(fetchData, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleRefresh);
+      clearInterval(interval);
+    };
   }, [selectedMonth]);
 
   const fetchData = async () => {

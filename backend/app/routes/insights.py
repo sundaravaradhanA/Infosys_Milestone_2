@@ -226,31 +226,64 @@ def get_top_merchants(
 @router.get("/burn-rate")
 def get_burn_rate(
     user_id: int = Depends(get_current_user_id),
-    month: Optional[str] = Query(None),
+    month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: Session = Depends(get_db)
 ):
-    """Budget burn rate: % of budget used"""
-    budgets = db.query(Budget).filter(Budget.user_id == user_id).all()
-    if not budgets:
-        return {"burn_rate": 0, "used_percent": 0}
+    """Budget burn rate: % of budget used for overall and per category"""
+    # Filter budgets by user and optionally by month
+    budget_query = db.query(Budget).filter(Budget.user_id == user_id)
+    if month:
+        budget_query = budget_query.filter(Budget.month == month)
     
-    total_limit = sum(b.limit_amount for b in budgets)
-    total_spent = sum(b.spent_amount for b in budgets)
-    used_percent = (total_spent / total_limit * 100) if total_limit > 0 else 0
+    budgets = budget_query.all()
+    if not budgets:
+        return {
+            "total_budget": 0,
+            "total_spent": 0,
+            "used_percent": 0,
+            "projected_monthly": 0,
+            "burn_rate_percent": 0,
+            "categories": []
+        }
+    
+    total_limit = sum(b.limit_amount or 0 for b in budgets)
+    total_spent = sum(b.spent_amount or 0 for b in budgets)
+    
+    # Cap used_percent at 100 as per user request
+    raw_used_percent = (float(total_spent) / float(total_limit) * 100) if total_limit > 0 else 0
+    used_percent = min(raw_used_percent, 100)
+    
+    # Category-wise burn rates
+    category_burn = []
+    for b in budgets:
+        cat_limit = float(b.limit_amount or 0)
+        cat_spent = float(b.spent_amount or 0)
+        cat_pct = (cat_spent / cat_limit * 100) if cat_limit > 0 else 0
+        category_burn.append({
+            "category": b.category or "Unknown",
+            "limit": cat_limit,
+            "spent": cat_spent,
+            "used_percent": round(min(cat_pct, 100), 2)
+        })
     
     # Days used estimate
     now = datetime.now()
-    month_start = now.replace(day=1)
-    days_passed = (now - month_start).days
-    projected = (total_spent / days_passed * 30) if days_passed > 0 else 0
-    burn_rate = min(projected / total_limit * 100, 100) if total_limit > 0 else 0
+    if month and month != now.strftime("%Y-%m"):
+        projected = float(total_spent)
+        burn_rate_percent = used_percent
+    else:
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        days_passed = (now - month_start).days
+        projected = (float(total_spent) / days_passed * 30) if days_passed > 0 else float(total_spent)
+        burn_rate_percent = min(projected / float(total_limit) * 100, 100) if total_limit > 0 else 0
     
     return {
         "total_budget": float(total_limit),
         "total_spent": float(total_spent),
-        "used_percent": round(used_percent, 2),
+        "used_percent": round(float(used_percent), 2),
         "projected_monthly": float(projected),
-        "burn_rate_percent": round(burn_rate, 2)
+        "burn_rate_percent": round(float(burn_rate_percent), 2),
+        "categories": category_burn
     }
 
 # Aliases for Insights Dashboard

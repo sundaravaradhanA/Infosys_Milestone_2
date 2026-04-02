@@ -57,6 +57,12 @@ function Profile() {
       });
 
       setSaveSuccess(true);
+      // Update local storage so the dashboard header can find the new name
+      if (user.name) {
+        localStorage.setItem("user_name", user.name);
+      }
+      // Trigger global live refresh (synchronizes name in dashboard header)
+      window.dispatchEvent(new Event("app-data-updated"));
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       console.error(err);

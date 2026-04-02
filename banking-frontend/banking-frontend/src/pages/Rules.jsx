@@ -69,6 +69,8 @@ function Rules() {
         setShowForm(false);
         setFormData({ category: "", keyword_pattern: "", merchant_pattern: "", priority: 50, is_active: true });
         fetchRules();
+        // Trigger global live refresh
+        window.dispatchEvent(new Event("app-data-updated"));
       }
     } catch (err) {
       console.error("Save failed", err);
@@ -83,7 +85,11 @@ function Rules() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.ok) fetchRules();
+      if (response.ok) {
+        fetchRules();
+        // Trigger global live refresh
+        window.dispatchEvent(new Event("app-data-updated"));
+      }
     } catch (err) {
       console.error(err);
     }

@@ -17,29 +17,54 @@ import Bills from "./Bills";
 function Dashboard() {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
-  const userName = localStorage.getItem("user_name") || "User";
+  const [userName, setUserName] = useState(localStorage.getItem("user_name") || "User");
   const userId = localStorage.getItem("user_id") || 1;
 
   useEffect(() => {
-    const fetchUnreadCount = async () => {
+    const fetchUserData = async () => {
       const token = localStorage.getItem("token");
       if (!token) return;
       try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/alerts/unread-count?user_id=${userId}`, {
+        // Fetch unread count
+        const alertRes = await fetchWithAuth(`${API_BASE_URL}/alerts/unread-count?user_id=${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (response.ok) {
-          const data = await response.json();
+        if (alertRes.ok) {
+          const data = await alertRes.json();
           setUnreadCount(data.unread_count || 0);
         }
+
+        // Fetch profile to get real user name
+        const userRes = await fetchWithAuth(`${API_BASE_URL}/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (userRes.ok) {
+          const users = await userRes.json();
+          // Find the current user in the list or fetch by ID if route exists
+          const current = users.find(u => u.id == userId);
+          if (current) {
+            setUserName(current.name);
+            localStorage.setItem("user_name", current.name);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch unread count:", err);
+        console.error("Dashboard fetch error:", err);
       }
     };
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchUserData();
+    
+    const handleRefresh = () => {
+      console.log("Global update in shell detected - Refreshing header...");
+      fetchUserData();
+    };
+    window.addEventListener("app-data-updated", handleRefresh);
+
+    const interval = setInterval(fetchUserData, 30000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("app-data-updated", handleRefresh);
+    };
+  }, [userId]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -200,6 +225,25 @@ function DashboardHome() {
   const token = localStorage.getItem("token");
 
   useEffect(() => {
+    fetchData(); // Initial load
+    
+    // Global listener for instant reflex
+    const handleDataUpdate = () => {
+      console.log("Global data update detected - Refetching Dashboard Home...");
+      fetchData();
+    };
+    window.addEventListener("app-data-updated", handleDataUpdate);
+
+    // Periodic live sync (60s)
+    const interval = setInterval(fetchData, 60000);
+
+    return () => {
+      window.removeEventListener("app-data-updated", handleDataUpdate);
+      clearInterval(interval);
+    };
+  }, [token]);
+
+  const fetchData = () => {
     const userId = localStorage.getItem("user_id") || 1;
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -221,7 +265,7 @@ function DashboardHome() {
       if(currData) setCurrencyRates(currData);
       setIsLoading(false);
     });
-  }, [token]);
+  };
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance_inr, 0);
 
