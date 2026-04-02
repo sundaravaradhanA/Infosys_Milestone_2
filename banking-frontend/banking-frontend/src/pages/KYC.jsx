@@ -38,12 +38,35 @@ function KYC() {
   };
 
   const handleUpload = async () => {
+    // Basic validation
+    if (!formData.fullName || !formData.aadhaarNumber || !formData.panNumber) {
+      alert("Please complete the personal details step first.");
+      setCurrentStep(1);
+      return;
+    }
+
     setIsUploading(true);
-    // Simulate upload
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsUploading(false);
-    setUploadComplete(true);
-    setCurrentStep(3);
+    const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("user_id") || 1;
+
+    try {
+      // 1. Simulate document storage on local database via PATCH to kyc_status
+      await fetchWithAuth(`http://localhost:8000/users/${userId}/kyc?kyc_status=Verification Pending`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // 2. Mock storage delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setIsUploading(false);
+      setUploadComplete(true);
+      setCurrentStep(3);
+    } catch (err) {
+      console.error("KYC Submission failed:", err);
+      alert("Document storage failed. Please try again.");
+      setIsUploading(false);
+    }
   };
 
   const steps = [

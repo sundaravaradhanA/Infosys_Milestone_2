@@ -75,6 +75,7 @@ function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [selectedTxn, setSelectedTxn] = useState(null);
   const [editCategory, setEditCategory] = useState("");
+  const [editAmount, setEditAmount] = useState("");
   const [saveAsRule, setSaveAsRule] = useState(false);
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -131,12 +132,13 @@ function Transactions() {
       currency: 'INR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(Math.abs(amount));
+    }).format(amount);
   };
 
   const handleSelectTransaction = (txn) => {
     setSelectedTxn(txn);
     setEditCategory(txn.category || "");
+    setEditAmount(Math.abs(txn.amount_inr || 0).toString());
     setSaveAsRule(false);
   };
 
@@ -146,7 +148,8 @@ function Transactions() {
     const token = localStorage.getItem("token");
     
     try {
-      const response = await fetchWithAuth(
+      // Update category
+      const categoryResponse = await fetchWithAuth(
         `${API_BASE_URL}/transactions/${selectedTxn.id}/category?save_as_rule=${saveAsRule}`,
         {
           method: "PUT",
@@ -158,14 +161,39 @@ function Transactions() {
         }
       );
       
-      if (response.ok) {
-        const updatedTxn = await response.json();
+      if (categoryResponse.ok) {
+        const updatedTxn = await categoryResponse.json();
+
+        // Update amount if changed
+        const newAmountInr = parseFloat(editAmount);
+        const originalAmountInr = Math.abs(selectedTxn.amount_inr || 0);
+        
+        if (!isNaN(newAmountInr) && newAmountInr !== originalAmountInr) {
+          // Preserve the original sign (Income: positive, Expense: negative)
+          const isExpense = (selectedTxn.amount_usd || 0) < 0;
+          const signedInr = isExpense ? -Math.abs(newAmountInr) : Math.abs(newAmountInr);
+          const signedUsd = signedInr / 84;
+
+          // Update backend for amount change as well
+          await fetchWithAuth(`${API_BASE_URL}/transactions/${selectedTxn.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ amount: signedUsd }),
+          });
+
+          updatedTxn.amount_inr = signedInr;
+          updatedTxn.amount_usd = signedUsd;
+        }
+
         setTransactions(
           transactions.map((t) =>
-            t.id === selectedTxn.id ? updatedTxn : t
+            t.id === selectedTxn.id ? { ...t, ...updatedTxn } : t
           )
         );
-        setSelectedTxn(updatedTxn);
+        setSelectedTxn({ ...selectedTxn, ...updatedTxn });
         
         // Refresh rules if saved as rule
         if (saveAsRule) {
@@ -388,10 +416,10 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
                         )}
                       </td>
                       <td className="py-3 pr-4 text-right">
-<span className={`font-display font-bold text-lg ${
+                        <span className={`font-display font-bold text-lg ${
                           txn.amount_usd >= 0 ? "text-success-600" : "text-danger-600"
                         }`}>
-                          {txn.amount_usd >= 0 ? '+' : '-'}₹{formatAmount(txn.amount_inr)}
+                          {formatAmount(txn.amount_inr)}
                         </span>
                       </td>
                     </tr>
@@ -440,12 +468,22 @@ const totalIncome = transactions.filter(t => t.amount_usd > 0).reduce((sum, t) =
               <div className="p-4 bg-dark-50 rounded-xl">
                 <p className="text-sm text-dark-500 mb-1">Description</p>
                 <p className="font-semibold text-dark-800 mb-3">{selectedTxn.description}</p>
-                <p className="text-sm text-dark-500 mb-1">Amount</p>
-<p className={`font-display font-bold text-xl ${
-                  selectedTxn.amount_usd >= 0 ? "text-success-600" : "text-danger-600"
-                }`}>
-                  {selectedTxn.amount_usd >= 0 ? '+' : '-'}₹{Math.abs(selectedTxn.amount_inr)}
-                </p>
+                <p className="text-sm text-dark-500 mb-1">Amount (₹ INR)</p>
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold text-lg ${selectedTxn.amount_usd >= 0 ? 'text-success-600' : 'text-danger-600'}`}>
+                    {selectedTxn.amount_usd >= 0 ? '+' : '-'}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    className="input-modern flex-1 text-right"
+                    placeholder="Amount in ₹"
+                  />
+                </div>
+                <p className="text-xs text-dark-400 mt-1">Edit amount if needed before saving</p>
               </div>
 
               {/* Category Select */}

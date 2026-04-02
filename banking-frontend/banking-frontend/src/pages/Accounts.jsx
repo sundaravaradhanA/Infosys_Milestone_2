@@ -10,6 +10,7 @@ function Accounts() {
   const [balance, setBalance] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     fetchAccounts();
@@ -21,7 +22,7 @@ function Accounts() {
     fetchWithAuth(`${API_BASE_URL}/accounts/?user_id=${userId}`)
       .then((res) => res.json())
       .then((data) => {
-        setAccounts(data);
+        if (Array.isArray(data)) setAccounts(data);
         setLoading(false);
       })
       .catch((err) => {
@@ -48,31 +49,43 @@ function Accounts() {
           user_id: parseInt(localStorage.getItem("user_id") || 1),
           bank_name: bankName,
           account_type: accountType,
-          balance: parseFloat(balance),
+          balance_usd: parseFloat(balance),  // ✅ Fixed field name
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to add account");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to add account");
       }
 
       await response.json();
 
-      // Reset form
       setShowModal(false);
       setBankName("");
       setAccountType("Savings");
       setBalance("");
-
-      // Refresh table
+      setSuccessMsg("Account added successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
       fetchAccounts();
 
     } catch (error) {
       console.error(error);
-      alert("Error adding account");
+      alert(`Error adding account: ${error.message}`);
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleDeleteAccount = async (accountId) => {
+    if (!window.confirm("Delete this account?")) return;
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/accounts/${accountId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) fetchAccounts();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -86,31 +99,23 @@ function Accounts() {
 
   const getAccountIcon = (type) => {
     switch (type.toLowerCase()) {
-      case 'savings':
-        return <Wallet className="w-5 h-5" />;
-      case 'current':
-        return <Building2 className="w-5 h-5" />;
-      case 'credit':
-        return <CreditCard className="w-5 h-5" />;
-      default:
-        return <Wallet className="w-5 h-5" />;
+      case 'savings': return <Wallet className="w-5 h-5" />;
+      case 'current': return <Building2 className="w-5 h-5" />;
+      case 'credit': return <CreditCard className="w-5 h-5" />;
+      default: return <Wallet className="w-5 h-5" />;
     }
   };
 
   const getAccountGradient = (type) => {
     switch (type.toLowerCase()) {
-      case 'savings':
-        return "from-brand-400 to-brand-600";
-      case 'current':
-        return "from-success-400 to-success-600";
-      case 'credit':
-        return "from-warning-400 to-warning-600";
-      default:
-        return "from-brand-400 to-brand-600";
+      case 'savings': return "from-brand-400 to-brand-600";
+      case 'current': return "from-success-400 to-success-600";
+      case 'credit': return "from-warning-400 to-warning-600";
+      default: return "from-brand-400 to-brand-600";
     }
   };
 
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance_inr, 0);
+  const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balance_inr || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -128,6 +133,13 @@ function Accounts() {
           Add Account
         </button>
       </div>
+
+      {/* Success message */}
+      {successMsg && (
+        <div className="p-3 bg-success-50 border border-success-200 text-success-700 rounded-xl font-medium text-sm flex items-center gap-2">
+          <Check className="w-4 h-4" /> {successMsg}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -196,7 +208,8 @@ function Accounts() {
                 <tr>
                   <th className="pl-6">Bank</th>
                   <th>Type</th>
-                  <th>Balance</th>
+                  <th>Balance (INR)</th>
+                  <th>Balance (USD)</th>
                   <th className="pr-6 text-right">Actions</th>
                 </tr>
               </thead>
@@ -229,12 +242,18 @@ function Accounts() {
                         {formatCurrency(acc.balance_inr)}
                       </span>
                     </td>
+                    <td>
+                      <span className="text-dark-600 font-medium">
+                        ${acc.balance_usd?.toFixed(2) || '0.00'}
+                      </span>
+                    </td>
                     <td className="pr-6">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 rounded-lg bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 rounded-lg bg-danger-50 text-danger-600 hover:bg-danger-100 transition-colors">
+                        <button
+                          onClick={() => handleDeleteAccount(acc.id)}
+                          className="p-2 rounded-lg bg-danger-50 text-danger-600 hover:bg-danger-100 transition-colors"
+                          title="Delete account"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -251,7 +270,6 @@ function Accounts() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content p-6" onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-display font-bold text-dark-800">
                 Add New Account
@@ -264,7 +282,6 @@ function Accounts() {
               </button>
             </div>
 
-            {/* Form */}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-2">
@@ -272,7 +289,7 @@ function Accounts() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter bank name"
+                  placeholder="e.g. SBI, HDFC, ICICI"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
                   className="input-modern"
@@ -296,19 +313,23 @@ function Accounts() {
 
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-2">
-                  Initial Balance (₹)
+                  Initial Balance ($ USD)
                 </label>
-                <input
-                  type="number"
-                  placeholder="Enter initial balance"
-                  value={balance}
-                  onChange={(e) => setBalance(e.target.value)}
-                  className="input-modern"
-                />
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    placeholder="Enter initial balance in USD"
+                    value={balance}
+                    onChange={(e) => setBalance(e.target.value)}
+                    className="input-with-icon"
+                    min="0"
+                  />
+                </div>
+                <p className="text-xs text-dark-400 mt-1">Amount will be converted to INR for display (1 USD ≈ ₹84)</p>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowModal(false)}
@@ -339,4 +360,3 @@ function Accounts() {
 }
 
 export default Accounts;
-

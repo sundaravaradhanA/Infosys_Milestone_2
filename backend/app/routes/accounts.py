@@ -49,7 +49,18 @@ def create_account(account: AccountCreate, db: Session = Depends(get_db)):
     db.add(new_account)
     db.commit()
     db.refresh(new_account)
-    return new_account
+    
+    rate = currency_service.get_usd_to_inr_rate()
+    return AccountResponse(
+        id=new_account.id,
+        user_id=new_account.user_id,
+        bank_name=new_account.bank_name,
+        account_type=new_account.account_type,
+        balance_usd=float(new_account.balance),
+        currency=new_account.currency,
+        balance_inr=currency_service.convert_usd_to_inr(float(new_account.balance)),
+        usd_to_inr_rate=rate
+    )
 
 @router.get("/{account_id}", response_model=AccountResponse)
 def get_account(

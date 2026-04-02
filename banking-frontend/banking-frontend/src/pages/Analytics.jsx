@@ -21,23 +21,22 @@ import {
   BarChart as BarChartIcon,
   ArrowUpRight, 
   ArrowDownRight,
-  Download,
   FileDown,
   Loader2,
   Calendar
 } from "lucide-react";
 
 const COLORS = [
-  "#3B82F6", // blue
-  "#10B981", // green
-  "#F59E0B", // amber
-  "#EF4444", // red
-  "#8B5CF6", // violet
-  "#EC4899", // pink
-  "#06B6D4", // cyan
-  "#84CC16", // lime
-  "#F97316", // orange
-  "#6366F1", // indigo
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#EC4899",
+  "#06B6D4",
+  "#84CC16",
+  "#F97316",
+  "#6366F1",
 ];
 
 const USD_TO_INR = 84;
@@ -45,8 +44,6 @@ const USD_TO_INR = 84;
 function Analytics() {
   const [monthlySummary, setMonthlySummary] = useState({ total_income: 0, total_expense: 0 });
   const [categoryData, setCategoryData] = useState([]);
-  const [topMerchants, setTopMerchants] = useState([]);
-  const [burnRate, setBurnRate] = useState(null);
   const [chartType, setChartType] = useState("pie");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
@@ -61,10 +58,8 @@ function Analytics() {
     const userId = localStorage.getItem("user_id") || 1;
 
     try {
-      const [categoryRes, merchantsRes, burnRateRes, summaryRes] = await Promise.all([
+      const [categoryRes, summaryRes] = await Promise.all([
         fetchWithAuth(`${API_BASE_URL}/insights/spending-by-category?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetchWithAuth(`${API_BASE_URL}/insights/top-merchants?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetchWithAuth(`${API_BASE_URL}/insights/burn-rate?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetchWithAuth(`${API_BASE_URL}/insights/monthly-summary?user_id=${userId}&month=${selectedMonth}`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
@@ -76,14 +71,6 @@ function Analytics() {
           color: COLORS[index % COLORS.length],
         }));
         setCategoryData(formattedData);
-      }
-
-      if (merchantsRes.ok) {
-        setTopMerchants(await merchantsRes.json());
-      }
-
-      if (burnRateRes.ok) {
-        setBurnRate(await burnRateRes.json());
       }
 
       if (summaryRes.ok) {
@@ -129,7 +116,7 @@ function Analytics() {
     }).format(amount);
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-4 rounded-xl shadow-lg border border-dark-100">
@@ -215,7 +202,7 @@ function Analytics() {
           </div>
         </div>
 
-        <div className={`card p-6 hover:shadow-lg transition-shadow ${netBalance >= 0 ? '' : ''}`}>
+        <div className="card p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${netBalance >= 0 ? 'bg-gradient-to-br from-brand-400 to-brand-600 shadow-brand-500/20' : 'bg-gradient-to-br from-warning-400 to-warning-600 shadow-warning-500/20'}`}>
               <Wallet className="w-6 h-6 text-white" />
@@ -301,7 +288,7 @@ function Analytics() {
               ) : (
                 <BarChart data={categoryData} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                  <XAxis type="number" tickFormatter={(v) => `₹${v}`} />
+                  <XAxis type="number" tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
                   <YAxis
                     dataKey="category"
                     type="category"
@@ -400,58 +387,8 @@ function Analytics() {
           </div>
         )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Top Merchants */}
-        <div className="card p-6">
-          <h2 className="text-xl font-display font-bold text-dark-800 mb-4">Top Merchants</h2>
-          {topMerchants.length > 0 ? (
-            <div className="space-y-4">
-              {topMerchants.slice(0, 5).map((merchant, idx) => (
-                <div key={idx} className="flex justify-between items-center bg-dark-50 p-3 rounded-lg">
-                  <span className="font-semibold text-dark-700">{merchant.merchant}</span>
-                  <span className="font-bold text-danger-600">{formatAmount(merchant.total_spent * USD_TO_INR)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-dark-500 text-sm py-4 text-center">No merchants found for this month.</p>
-          )}
-        </div>
-
-        {/* Burn Rate */}
-        <div className="card p-6 flex flex-col justify-center">
-          <h2 className="text-xl font-display font-bold text-dark-800 mb-4">Budget Burn Rate</h2>
-          {burnRate && burnRate.total_budget > 0 ? (
-            <div className="space-y-4 text-center">
-              <div className="relative w-32 h-32 mx-auto flex items-center justify-center rounded-full border-8 border-dark-100">
-                <div 
-                  className="absolute inset-0 rounded-full border-8 border-brand-500"
-                  style={{ 
-                    clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, 
-                    transform: `rotate(${(burnRate.used_percent / 100) * 360}deg)`,
-                    borderColor: burnRate.used_percent > 100 ? '#ef4444' : '#3b82f6'
-                  }}
-                ></div>
-                <div className="z-10 bg-white w-24 h-24 rounded-full flex items-center justify-center flex-col shadow-inner">
-                  <span className="text-2xl font-bold font-display">{Math.round(burnRate.used_percent)}%</span>
-                  <span className="text-xs text-dark-400">Used</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-dark-600">Total Budget: <span className="font-bold">{formatAmount(burnRate.total_budget * USD_TO_INR)}</span></p>
-                <p className="text-dark-600">Spent: <span className="font-bold text-danger-600">{formatAmount(burnRate.total_spent * USD_TO_INR)}</span></p>
-                <p className="mt-2 text-sm text-dark-500">Projected Monthly: {formatAmount(burnRate.projected_monthly * USD_TO_INR)}</p>
-              </div>
-            </div>
-          ) : (
-             <p className="text-dark-500 text-sm py-4 text-center">No active budget matching selected criteria.</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
 
 export default Analytics;
-

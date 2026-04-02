@@ -1,5 +1,6 @@
 import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Plus, 
   Calendar, 
@@ -228,7 +229,7 @@ function Budget() {
     const payload = {
       user_id: parseInt(localStorage.getItem("user_id") || 1),
       category: formData.category,
-      limit_amount: parseFloat(formData.limit_amount),
+      limit_amount_usd: parseFloat(formData.limit_amount),
       month: formData.month
     };
 
@@ -241,7 +242,7 @@ function Budget() {
         url = `${API_BASE_URL}/budgets/${editingBudget.id}?user_id=${userId}`;
         method = "PUT";
         payload.category = formData.category;
-        payload.limit_amount = parseFloat(formData.limit_amount);
+        payload.limit_amount_usd = parseFloat(formData.limit_amount);
         payload.month = formData.month;
       }
 
@@ -277,7 +278,7 @@ function Budget() {
     setEditingBudget(budget);
     setFormData({
       category: budget.category,
-      limit_amount: budget.limit_amount.toString(),
+      limit_amount: (budget.limit_amount_usd || 0).toString(),
       month: budget.month
     });
     setShowForm(true);
@@ -324,11 +325,11 @@ function Budget() {
     }).format(amount);
   };
 
-  // Calculate totals from budgets
-  const totalBudget = budgets.reduce((sum, b) => sum + parseFloat(b.limit_amount || 0), 0);
-  const totalSpent = budgets.reduce((sum, b) => sum + parseFloat(b.spent_amount || 0), 0);
-  const totalRemaining = totalBudget - totalSpent;
-  const budgetUtilization = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+  // Calculate totals from budgets (convert USD to INR for display)
+  const totalBudgetInr = budgets.reduce((sum, b) => sum + parseFloat(b.limit_amount_usd || 0), 0) * 84;
+  const totalSpentInr = budgets.reduce((sum, b) => sum + parseFloat(b.spent_amount || 0), 0);
+  const totalRemainingInr = totalBudgetInr - totalSpentInr;
+  const budgetUtilization = totalBudgetInr > 0 ? (totalSpentInr / totalBudgetInr) * 100 : 0;
 
   if (loading) {
     return (
@@ -385,7 +386,7 @@ function Budget() {
                 </div>
                 <span className="text-sm text-dark-500">Total Budget</span>
               </div>
-              <p className="text-2xl font-display font-bold text-dark-800">{formatAmount(totalBudget)}</p>
+              <p className="text-2xl font-display font-bold text-dark-800">{formatAmount(totalBudgetInr)}</p>
             </div>
             
             <div className="card p-5">
@@ -395,7 +396,7 @@ function Budget() {
                 </div>
                 <span className="text-sm text-dark-500">Total Spent</span>
               </div>
-              <p className="text-2xl font-display font-bold text-danger-600">{formatAmount(totalSpent)}</p>
+              <p className="text-2xl font-display font-bold text-danger-600">{formatAmount(totalSpentInr)}</p>
             </div>
 
             <div className="card p-5">
@@ -405,8 +406,8 @@ function Budget() {
                 </div>
                 <span className="text-sm text-dark-500">Remaining</span>
               </div>
-              <p className={`text-2xl font-display font-bold ${totalRemaining >= 0 ? "text-success-600" : "text-danger-600"}`}>
-                {formatAmount(totalRemaining)}
+              <p className={`text-2xl font-display font-bold ${totalRemainingInr >= 0 ? "text-success-600" : "text-danger-600"}`}>
+                {formatAmount(totalRemainingInr)}
               </p>
             </div>
 
@@ -418,7 +419,7 @@ function Budget() {
                 <span className="text-sm text-dark-500">Utilization</span>
               </div>
               <p className={`text-2xl font-display font-bold ${budgetUtilization >= 100 ? "text-danger-600" : budgetUtilization >= 70 ? "text-warning-600" : "text-success-600"}`}>
-                {budgetUtilization.toFixed(1)}%
+                {Math.min(budgetUtilization, 100).toFixed(1)}%
               </p>
             </div>
           </div>
@@ -488,7 +489,7 @@ function Budget() {
                           )}
                         </div>
                         <p className="text-sm text-dark-500 mb-3">
-                          {formatAmount(budget.spent_amount || 0)} spent of {formatAmount(budget.limit_amount || 0)}
+                          {formatAmount(budget.spent_amount || 0)} spent of {formatAmount((budget.limit_amount_usd || 0) * 84)}
                         </p>
                         {/* Progress Bar */}
                         <div className="h-3 bg-dark-100 rounded-full overflow-hidden">
@@ -505,7 +506,7 @@ function Budget() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-lg font-display font-bold ${budget.is_over_budget ? 'text-danger-600' : 'text-dark-800'}`}>
-                          {(budget.progress_percentage || 0).toFixed(0)}%
+                          {Math.min(budget.progress_percentage || 0, 100).toFixed(0)}%
                         </span>
                         <div className="flex gap-1 ml-4">
                           <button
@@ -567,20 +568,24 @@ function Budget() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark-700 mb-2">
-                  Budget Limit (₹)
-                </label>
-                <input
-                  type="number"
-                  name="limit_amount"
-                  value={formData.limit_amount}
-                  onChange={handleInputChange}
-                  required
-                  min="0"
-                  step="0.01"
-                  className="input-modern"
-                  placeholder="Enter amount"
-                />
+                  <label className="block text-sm font-medium text-dark-700 mb-2">
+                    Budget Limit ($ USD)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400 font-bold">$</span>
+                    <input
+                      type="number"
+                      name="limit_amount"
+                      value={formData.limit_amount}
+                      onChange={handleInputChange}
+                      required
+                      min="0"
+                      step="0.01"
+                      className="input-with-icon"
+                      placeholder="Enter amount in USD"
+                    />
+                  </div>
+                  <p className="text-xs text-dark-400 mt-1">Displayed in INR (1 USD ≈ ₹84)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-dark-700 mb-2">

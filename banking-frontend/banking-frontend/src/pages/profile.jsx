@@ -260,12 +260,13 @@ function Profile() {
             <h3 className="text-lg font-display font-bold text-dark-800 mb-4">Quick Actions</h3>
             <div className="space-y-2">
               {[
-                { label: 'Change Password', icon: Lock },
-                { label: 'Download Statement', icon: User },
-                { label: 'Manage Alerts', icon: Bell },
+                { label: 'Change Password', icon: Lock, action: () => alert('Confirm: An email has been sent to your registered address to reset your password.') },
+                { label: 'Download Statement', icon: User, action: () => alert('Preparing your statement for download... Please wait.') },
+                { label: 'Manage Alerts', icon: Bell, action: () => alert('Navigating to alert management preferences...') },
               ].map((action, index) => (
                 <button
                   key={index}
+                  onClick={action.action}
                   className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-dark-50 transition-colors text-left"
                 >
                   <action.icon className="w-5 h-5 text-dark-500" />

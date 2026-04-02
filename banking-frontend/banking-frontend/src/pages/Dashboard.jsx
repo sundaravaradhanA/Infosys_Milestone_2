@@ -191,6 +191,7 @@ function Dashboard() {
 export default Dashboard;
 
 function DashboardHome() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [upcomingBills, setUpcomingBills] = useState([]);
   const [currencyRates, setCurrencyRates] = useState(null);
@@ -261,10 +262,16 @@ function DashboardHome() {
             </h1>
             
             <div className="flex flex-wrap gap-4 mt-8">
-              <button className="bg-white text-indigo-700 px-6 py-3 rounded-2xl font-bold hover:shadow-lg transition-all transform hover:-translate-y-1">
+              <button 
+                onClick={() => navigate("/dashboard/accounts")}
+                className="bg-white text-indigo-700 px-6 py-3 rounded-2xl font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
+              >
                 + Add Money
               </button>
-              <button className="bg-indigo-800/50 backdrop-blur-md border border-indigo-400/30 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-800 transition-all">
+              <button 
+                onClick={() => navigate("/dashboard/transactions")}
+                className="bg-indigo-800/50 backdrop-blur-md border border-indigo-400/30 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-800 transition-all"
+              >
                 Send Money
               </button>
             </div>

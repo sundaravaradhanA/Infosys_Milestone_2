@@ -2,8 +2,9 @@ import {fetchWithAuth , API_BASE_URL} from "../services/api";
 import React, { useState, useEffect } from "react";
 import { FileText, Plus, Edit3, Trash2, CheckCircle2, AlertTriangle, Calendar, DollarSign, AlertCircle, Loader2 } from "lucide-react";
 
-const formatCurrency = (amt) => {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0 }).format(amt);
+const formatCurrency = (amtUsd) => {
+  const amtInr = (amtUsd || 0) * 84;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0 }).format(amtInr);
 };
 
 const getStatusDetails = (status) => {
@@ -56,7 +57,7 @@ function Bills() {
         auto_pay: formData.auto_pay
       };
 
-      let url = '${API_BASE_URL}/api/bills/';
+      let url = `${API_BASE_URL}/api/bills/`;
       let method = 'POST';
       
       if (editingId) {
@@ -310,9 +311,9 @@ function Bills() {
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Amount Due</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Amount Due ($ USD)</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                   <input
                     type="number"
                     step="0.01"
@@ -320,10 +321,11 @@ function Bills() {
                     value={formData.amount_due}
                     onChange={(e) => setFormData({...formData, amount_due: e.target.value})}
                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-medium text-gray-900 transition-all outline-none"
-                    placeholder="0.00"
+                    placeholder="Enter amount in USD"
                     required
                   />
                 </div>
+                <p className="text-xs text-gray-400 mt-1">Displayed in INR (1 USD ≈ ₹84)</p>
               </div>
               
               <div>

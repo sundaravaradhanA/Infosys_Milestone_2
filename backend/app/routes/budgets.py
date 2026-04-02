@@ -63,7 +63,7 @@ def get_budgets(
             "id": budget.id,
             "user_id": budget.user_id,
             "category": budget.category,
-            "limit_amount": limit_amount,
+            "limit_amount_usd": limit_amount,
             "spent_amount": spent_amount,
             "month": budget.month,
             "progress_percentage": progress_percentage,
@@ -76,7 +76,7 @@ def get_budgets(
     return result
 
 @router.post("/", response_model=BudgetResponse)
-def create_budget(budget: BudgetCreate, db: Session = Depends(get_db)):
+def create_budget(budget: BudgetCreate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
     """Create a new budget"""
     # Check if budget already exists for this category and month
     existing = db.query(Budget).filter(
@@ -91,14 +91,22 @@ def create_budget(budget: BudgetCreate, db: Session = Depends(get_db)):
     new_budget = Budget(
         user_id=budget.user_id,
         category=budget.category,
-        limit_amount=budget.limit_amount,
+        limit_amount=budget.limit_amount_usd,
         spent_amount=0,
         month=budget.month
     )
     db.add(new_budget)
     db.commit()
     db.refresh(new_budget)
-    return new_budget
+    return {
+        "id": new_budget.id,
+        "user_id": new_budget.user_id,
+        "category": new_budget.category,
+        "limit_amount_usd": float(new_budget.limit_amount),
+        "spent_amount": float(new_budget.spent_amount),
+        "month": new_budget.month,
+        "currency": new_budget.currency
+    }
 
 @router.put("/{budget_id}", response_model=BudgetResponse)
 def update_budget(budget_id: int, budget: BudgetUpdate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
@@ -113,14 +121,22 @@ def update_budget(budget_id: int, budget: BudgetUpdate, user_id: int = Depends(g
     
     if budget.category is not None:
         db_budget.category = budget.category
-    if budget.limit_amount is not None:
-        db_budget.limit_amount = budget.limit_amount
+    if budget.limit_amount_usd is not None:
+        db_budget.limit_amount = budget.limit_amount_usd
     if budget.month is not None:
         db_budget.month = budget.month
     
     db.commit()
     db.refresh(db_budget)
-    return db_budget
+    return {
+        "id": db_budget.id,
+        "user_id": db_budget.user_id,
+        "category": db_budget.category,
+        "limit_amount_usd": float(db_budget.limit_amount),
+        "spent_amount": float(db_budget.spent_amount),
+        "month": db_budget.month,
+        "currency": db_budget.currency
+    }
 
 @router.delete("/{budget_id}")
 def delete_budget(budget_id: int, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)):
