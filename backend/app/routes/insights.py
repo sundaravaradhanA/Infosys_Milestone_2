@@ -7,6 +7,7 @@ from datetime import datetime
 from app.database import get_db
 from app.models import Transaction, Account, Budget
 
+from app.services.currency_service import currency_service
 router = APIRouter()
 
 @router.get("/spending-by-category")
@@ -40,7 +41,11 @@ def get_spending_by_category(
     results = query.group_by(Transaction.category).all()
     
     return [
-        {"category": r.category or "Uncategorized", "amount": float(r.amount)}
+        {
+            "category": r.category or "Uncategorized", 
+            "amount": float(r.amount),
+            "amount_inr": currency_service.convert_usd_to_inr(float(r.amount))
+        }
         for r in results
     ]
 
@@ -75,7 +80,11 @@ def get_income_by_category(
     results = query.group_by(Transaction.category).all()
     
     return [
-        {"category": r.category or "Uncategorized", "amount": float(r.amount)}
+        {
+            "category": r.category or "Uncategorized", 
+            "amount": float(r.amount),
+            "amount_inr": currency_service.convert_usd_to_inr(float(r.amount))
+        }
         for r in results
     ]
 
@@ -117,6 +126,10 @@ def get_monthly_summary(
         "total_income": total_income,
         "total_expense": total_expense,
         "balance": total_income - total_expense,
+        "total_income_inr": currency_service.convert_usd_to_inr(total_income),
+        "total_expense_inr": currency_service.convert_usd_to_inr(total_expense),
+        "balance_inr": currency_service.convert_usd_to_inr(total_income - total_expense),
+        "exchange_rate": currency_service.get_usd_to_inr_rate(),
         "month": month
     }
 
@@ -221,7 +234,14 @@ def get_top_merchants(
         query = query.filter(func.to_char(Transaction.created_at, 'YYYY-MM') == month)
     
     results = query.limit(limit).all()
-    return [{"merchant": r.merchant or "Unknown", "total_spent": float(r.total_spent)} for r in results]
+    return [
+        {
+            "merchant": r.merchant or "Unknown", 
+            "total_spent": float(r.total_spent),
+            "total_spent_inr": currency_service.convert_usd_to_inr(float(r.total_spent))
+        } 
+        for r in results
+    ]
 
 @router.get("/burn-rate")
 def get_burn_rate(
@@ -263,6 +283,8 @@ def get_burn_rate(
             "category": b.category or "Unknown",
             "limit": cat_limit,
             "spent": cat_spent,
+            "limit_inr": currency_service.convert_usd_to_inr(cat_limit),
+            "spent_inr": currency_service.convert_usd_to_inr(cat_spent),
             "used_percent": round(min(cat_pct, 100), 2)
         })
     
@@ -280,8 +302,11 @@ def get_burn_rate(
     return {
         "total_budget": float(total_limit),
         "total_spent": float(total_spent),
+        "total_budget_inr": currency_service.convert_usd_to_inr(float(total_limit)),
+        "total_spent_inr": currency_service.convert_usd_to_inr(float(total_spent)),
         "used_percent": round(float(used_percent), 2),
         "projected_monthly": float(projected),
+        "projected_monthly_inr": currency_service.convert_usd_to_inr(float(projected)),
         "burn_rate_percent": round(float(burn_rate_percent), 2),
         "categories": category_burn
     }

@@ -39,7 +39,6 @@ const COLORS = [
   "#6366F1",
 ];
 
-const USD_TO_INR = 84;
 
 function Analytics() {
   const [monthlySummary, setMonthlySummary] = useState({ total_income: 0, total_expense: 0 });
@@ -79,7 +78,7 @@ function Analytics() {
         const catData = await categoryRes.json();
         const formattedData = catData.map((item, index) => ({
           ...item,
-          amount: item.amount * USD_TO_INR,
+          amount: item.amount_inr || (item.amount * 84), // Fallback if backend hasn't refreshed
           color: COLORS[index % COLORS.length],
         }));
         setCategoryData(formattedData);
@@ -114,10 +113,10 @@ function Analytics() {
     }
   };
 
-  // Calculate totals (INR)
-  const totalExpense = monthlySummary.total_expense * USD_TO_INR;
-  const totalIncome = monthlySummary.total_income * USD_TO_INR;
-  const netBalance = totalIncome - totalExpense;
+  // Calculate totals (INR) using backend standardized fields
+  const totalExpense = monthlySummary.total_expense_inr || (monthlySummary.total_expense * 84);
+  const totalIncome = monthlySummary.total_income_inr || (monthlySummary.total_income * 84);
+  const netBalance = monthlySummary.balance_inr || (totalIncome - totalExpense);
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat("en-IN", {

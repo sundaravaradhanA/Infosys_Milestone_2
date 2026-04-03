@@ -41,7 +41,6 @@ const COLORS = [
   "#6366F1",
 ];
 
-const USD_TO_INR = 84;
 
 function Insights() {
   const [cashflow, setCashflow] = useState({ total_income: 0, total_expense: 0 });
@@ -73,7 +72,7 @@ function Insights() {
         const catData = await categoryRes.json();
         const formattedData = catData.map((item, index) => ({
           ...item,
-          amount: item.amount * USD_TO_INR,
+          amount: item.amount_inr || (item.amount * 84), // Fallback if backend hasn't refreshed
           color: COLORS[index % COLORS.length],
         }));
         setCategoryData(formattedData);
@@ -114,10 +113,10 @@ function Insights() {
     };
   }, [selectedMonth]);
 
-  // Calculate totals (INR)
-  const totalExpense = (cashflow.total_expense || 0) * USD_TO_INR;
-  const totalIncome = (cashflow.total_income || 0) * USD_TO_INR;
-  const netBalance = totalIncome - totalExpense;
+  // Calculate totals (INR) using backend fields
+  const totalExpense = cashflow.total_expense_inr || ((cashflow.total_expense || 0) * 84);
+  const totalIncome = cashflow.total_income_inr || ((cashflow.total_income || 0) * 84);
+  const netBalance = cashflow.balance_inr || (totalIncome - totalExpense);
 
   const formatAmount = (amount) => {
     const num = parseFloat(amount);
@@ -132,9 +131,8 @@ function Insights() {
 
   // Safely get merchant amount - handle different API field names and ensure it's a number
   const getMerchantAmount = (merchant) => {
-    const raw = merchant.total_spent ?? merchant.total ?? merchant.amount ?? 0;
-    const num = parseFloat(raw);
-    return isNaN(num) ? 0 : num * USD_TO_INR;
+    const raw = merchant.total_spent_inr ?? merchant.amount_inr ?? (merchant.total_spent * 84) ?? 0;
+    return parseFloat(raw) || 0;
   };
 
   const CustomTooltip = ({ active, payload }) => {
@@ -380,11 +378,11 @@ function Insights() {
                     <div className="grid grid-cols-2 gap-8 mt-6 w-full px-8">
                       <div className="text-center">
                         <p className="text-dark-400 text-[10px] uppercase font-black tracking-widest mb-1">Threshold</p>
-                        <p className="text-dark-800 font-bold">{formatAmount(burnRate.total_budget * USD_TO_INR)}</p>
+                        <p className="text-dark-800 font-bold">{formatAmount(burnRate.total_budget_inr || (burnRate.total_budget * 84))}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-dark-400 text-[10px] uppercase font-black tracking-widest mb-1">Consumption</p>
-                        <p className="text-danger-600 font-bold">{formatAmount(burnRate.total_spent * USD_TO_INR)}</p>
+                        <p className="text-danger-600 font-bold">{formatAmount(burnRate.total_spent_inr || (burnRate.total_spent * 84))}</p>
                       </div>
                     </div>
                   </div>
@@ -401,7 +399,7 @@ function Insights() {
                           <div className="flex justify-between items-end mb-2">
                             <div>
                                <p className="text-sm font-bold text-dark-800 leading-tight mb-0.5">{cat.category}</p>
-                               <p className="text-[10px] text-dark-400 font-bold">{formatAmount(cat.spent * USD_TO_INR)} of {formatAmount(cat.limit * USD_TO_INR)}</p>
+                               <p className="text-[10px] text-dark-400 font-bold">{formatAmount(cat.spent_inr || (cat.spent * 84))} of {formatAmount(cat.limit_inr || (cat.limit * 84))}</p>
                             </div>
                             <span className={`text-xs font-black ${cat.used_percent >= 100 ? 'text-danger-600' : 'text-dark-700'}`}>
                               {cat.used_percent}%
@@ -437,7 +435,7 @@ function Insights() {
                     <div>
                       <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">Monthly Projection</p>
                       <p className="text-xl font-black leading-tight">
-                        {formatAmount(burnRate.projected_monthly * USD_TO_INR)}
+                        {formatAmount(burnRate.projected_monthly_inr || (burnRate.projected_monthly * 84))}
                       </p>
                     </div>
                  </div>
